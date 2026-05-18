@@ -1,0 +1,18 @@
+{
+  "name": "jk-hospital-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-grade hospital appointment and token management platform for JK Hospital.",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "stop": "pkill -f \"vite --host 0.0.0.0|nodemon src/server.js|node src/server.js\" || true",
+    "restart": "npm run stop && npm run dev",
+    "seed": "npm run seed --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

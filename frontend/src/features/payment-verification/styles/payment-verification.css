@@ -1,0 +1,141 @@
+/* Premium payment verification animations — Google Pay / Apple Pay inspired */
+
+@keyframes pv-pulse-ring {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.22);
+    opacity: 0;
+  }
+}
+
+@keyframes pv-check-draw {
+  0% {
+    stroke-dashoffset: 48;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pv-success-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pv-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes pv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pv-glow-success {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 40px 8px rgba(16, 185, 129, 0.45);
+  }
+}
+
+@keyframes pv-glow-failure {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 36px 6px rgba(239, 68, 68, 0.4);
+  }
+}
+
+.pv-modal-glass {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(248, 252, 255, 0.78));
+  box-shadow:
+    0 28px 80px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(22px) saturate(1.35);
+}
+
+.dark .pv-modal-glass {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.82));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+}
+
+.pv-status-processing .pv-icon-wrap {
+  animation: pv-pulse-ring 1.4s ease-out infinite;
+}
+
+.pv-status-success .pv-icon-wrap {
+  animation: pv-glow-success 1.8s ease-in-out infinite, pv-success-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pv-status-failure .pv-icon-wrap {
+  animation: pv-glow-failure 1.2s ease-in-out, pv-shake 0.5s ease-in-out;
+}
+
+.pv-spinner {
+  animation: pv-spin 0.85s linear infinite;
+}
+
+.pv-check-path {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: pv-check-draw 0.45s ease forwards 0.15s;
+}
+
+.pv-confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: pv-confetti-fall 1.2s ease-out forwards;
+}
+
+@keyframes pv-confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(120px) rotate(540deg);
+    opacity: 0;
+  }
+}
