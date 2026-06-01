@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Phone, ShieldCheck, UserRound } from 'lucide-react';
+import { ArrowRight, BadgeCheck, BellRing, FileCheck2, Phone, ShieldCheck, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -61,29 +61,37 @@ export default function CompleteProfilePage() {
   };
 
   return (
-    <main className="hospital-bg min-h-[calc(100vh-4rem)] py-12">
-      <div className="container-pad grid min-h-[70vh] place-items-center">
+    <main className="profile-completion-page min-h-[calc(100vh-4rem)] py-10">
+      <div className="container-pad grid min-h-[72vh] place-items-center">
         <motion.form
           onSubmit={submit}
-          className="glass w-full max-w-xl rounded-2xl p-7 shadow-[0_30px_90px_rgba(8,47,73,0.12)]"
+          className="profile-completion-card"
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="flex items-start gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-medical-600 to-emerald-500 text-white shadow-soft">
-              <ShieldCheck size={24} />
-            </span>
-            <div>
-              <p className="font-semibold text-medical-600">Required hospital profile</p>
-              <h1 className="mt-1 text-3xl font-bold text-ink">Complete your details</h1>
-              <p className="mt-2 text-sm text-slate-600">
-                This is required for appointment tokens, payment contact, queue updates, and hospital staff verification.
-              </p>
+          <div className="profile-completion-hero">
+            <div className="profile-completion-orb">
+              <ShieldCheck size={28} />
             </div>
+            <span>Required hospital profile</span>
+            <h1>Complete your details</h1>
+            <p>
+              This profile powers token booking, queue alerts, payment contact, and hospital staff verification.
+            </p>
           </div>
 
-          <div className="mt-7 grid gap-4 sm:grid-cols-2">
+          <div className="profile-benefits">
+            {[
+              [BadgeCheck, 'Verified patient identity'],
+              [BellRing, 'Queue and visit alerts'],
+              [FileCheck2, 'Invoices and records']
+            ].map(([Icon, label]) => (
+              <span key={label}><Icon size={15} /> {label}</span>
+            ))}
+          </div>
+
+          <div className="profile-form-grid">
             <label className="auth-field">
               <span className="inline-flex items-center gap-2"><UserRound size={15} /> First name</span>
               <input className="field" name="firstName" value={form.firstName} onChange={update} required placeholder="First name" />
@@ -107,7 +115,7 @@ export default function CompleteProfilePage() {
             </label>
           </div>
 
-          <button type="submit" disabled={saving} className="btn-primary mt-6 w-full disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={saving} className="profile-submit-button disabled:cursor-not-allowed disabled:opacity-60">
             {saving ? 'Saving profile...' : 'Continue to dashboard'}
             {!saving && <ArrowRight size={18} />}
           </button>

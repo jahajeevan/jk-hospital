@@ -7,7 +7,7 @@
     "dev": "NODE_OPTIONS=--dns-result-order=ipv4first nodemon src/server.js",
     "start": "NODE_OPTIONS=--dns-result-order=ipv4first node src/server.js",
     "seed": "node src/seed/seed.js",
-    "test": "node --test"
+    "test": "NODE_ENV=test TRUST_PROXY=false node --test"
   },
   "dependencies": {
     "@clerk/express": "^2.1.21",

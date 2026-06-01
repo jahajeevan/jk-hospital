@@ -3,15 +3,20 @@ import {
   AlertTriangle,
   Bot,
   ClipboardPenLine,
+  Cpu,
   Eraser,
   FileText,
+  Gauge,
   HelpCircle,
+  HeartPulse,
+  LifeBuoy,
   Loader2,
   MessageSquareText,
   Mic,
   Pill,
   Route,
   Send,
+  ShieldCheck,
   Sparkles
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -36,15 +41,15 @@ const tools = [
 ];
 
 const quickActions = [
-  { tool: 'triage', label: 'Chest pain help', prompt: 'I have chest pain and shortness of breath. What should I do right now?' },
-  { tool: 'symptom', label: 'Find department', prompt: 'I have fever, cough, and body pain for three days.' },
-  { tool: 'faq', label: 'Ambulance info', prompt: 'What is the ambulance or emergency contact for JK Hospital?' },
-  { tool: 'report', label: 'Explain report', prompt: 'Hemoglobin 10.2 g/dL, WBC 8200, Platelets 2.5 lakh. Please explain in simple words.' }
+  { tool: 'triage', label: 'Emergency triage', prompt: 'I have chest pain and shortness of breath. What should I do right now?' },
+  { tool: 'symptom', label: 'Route department', prompt: 'I have fever, cough, and body pain for three days.' },
+  { tool: 'faq', label: 'Hospital command', prompt: 'What is the ambulance or emergency contact for JK Hospital?' },
+  { tool: 'report', label: 'Decode report', prompt: 'Hemoglobin 10.2 g/dL, WBC 8200, Platelets 2.5 lakh. Please explain in simple words.' }
 ];
 
 const initialAssistantMessage = {
   role: 'assistant',
-  text: `Hello, I am JK Hospital's local AI assistant powered by Ollama. I can help with department suggestions, visit prep, reports, prescriptions, FAQs, and emergency guidance.\n\n${disclaimer}`
+  text: `Hello, I am JK Hospital's local AI assistant powered by Qwen3 8B on Ollama. I can help with department suggestions, visit prep, reports, prescriptions, FAQs, and emergency guidance.\n\n${disclaimer}`
 };
 
 const endpointByTool = {
@@ -81,9 +86,9 @@ const responseText = (tool, payload) => {
 
 const offlineResponse = (tool) => {
   if (tool === 'faq') {
-    return `Local AI is unavailable right now, but the hospital platform is still online.\n\nFor emergencies, contact JK Hospital at 7845265507. For timings, insurance, admissions, and department availability, please confirm with the hospital desk.\n\nTo restore AI answers, start Ollama and make sure gemma3:4b is available on port 11434.\n\n${disclaimer}`;
+    return `Local AI is unavailable right now, but the hospital platform is still online.\n\nFor emergencies, contact JK Hospital at 7845265507. For timings, insurance, admissions, and department availability, please confirm with the hospital desk.\n\nTo restore AI answers, start Ollama and make sure qwen3:4b is available on port 11434.\n\n${disclaimer}`;
   }
-  return `Local AI is unavailable right now. Please start Ollama and make sure gemma3:4b is running on http://127.0.0.1:11434.\n\nTry:\n\nollama serve\nollama pull gemma3:4b\n\n${disclaimer}`;
+  return `Local AI is unavailable right now. Please start Ollama and make sure qwen3:4b is running on http://127.0.0.1:11434.\n\nTry:\n\nollama serve\nollama pull qwen3:4b\n\n${disclaimer}`;
 };
 
 export default function SmartAiPage() {
@@ -152,113 +157,133 @@ export default function SmartAiPage() {
   };
 
   return (
-    <main className="hospital-bg min-h-[calc(100vh-4rem)] py-8">
-      <div className="container-pad">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <main className="ai-lab-page min-h-[calc(100vh-4rem)] py-6 md:py-8">
+      <div className="ai-lab-grid" aria-hidden="true" />
+      <div className="container-pad relative z-10">
+        <section className="ai-lab-hero ai-care-hero">
           <div>
-            <span className="live-badge inline-flex items-center gap-2"><Sparkles size={14} /> Local Gemma AI</span>
-            <h1 className="mt-4 text-3xl font-bold text-ink md:text-5xl">Smart Hospital AI</h1>
-            <p className="mt-2 max-w-3xl text-slate-600">Private local assistance for patients, doctors, and hospital operations with safety-first medical guardrails.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <span className="ai-lab-badge"><Sparkles size={14} /> Local Qwen3:8B care intelligence</span>
+            <h1>The hospital AI that listens like a care desk.</h1>
+            <p>
+              A private assistant for nervous patients and busy staff: triage guidance, department routing,
+              report explanations, prescription help, doctor-note formatting, and hospital FAQs in one calm cockpit.
+            </p>
+            <div className="ai-lab-quick">
               {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => useQuickAction(action)}
-                  className="rounded-full bg-white/78 px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-white/80 transition hover:bg-medical-50 hover:text-medical-700"
-                >
+                <button key={action.label} type="button" onClick={() => useQuickAction(action)}>
                   {action.label}
                 </button>
               ))}
             </div>
           </div>
-          <div className="rounded-xl bg-white/76 px-4 py-3 text-sm font-semibold text-slate-600 ring-1 ring-white/80">
-            <span className={`mr-2 inline-flex h-2 w-2 rounded-full ${config ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            Provider: <span className="text-medical-700">{activeProvider?.name || 'ollama'}</span>
-            <span className="mx-2 text-slate-300">/</span>
-            Model: <span className="text-medical-700">{activeProvider?.model || 'gemma3:4b'}</span>
+          <div className="ai-lab-status ai-care-radar">
+            <div className="ai-orb"><LifeBuoy size={30} /></div>
+            <dl>
+              <div>
+                <dt>Provider</dt>
+                <dd>{activeProvider?.name || 'ollama'}</dd>
+              </div>
+              <div>
+                <dt>Model</dt>
+                <dd>{activeProvider?.model || 'qwen3:4b'}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>{config ? 'Online' : 'Local standby'}</dd>
+              </div>
+            </dl>
           </div>
-        </div>
+        </section>
 
-        <div className="mt-7 grid gap-5 lg:grid-cols-[260px_1fr]">
-          <aside className="glass rounded-xl p-3">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="ai-lab-shell ai-care-shell">
+          <aside className="ai-tool-rail">
+            <div className="ai-rail-title">
+              <Cpu size={18} />
+              Modules
+            </div>
+            <div className="ai-tool-list">
               {tools.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setActiveTool(id)}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold transition ${activeTool === id ? 'bg-medical-600 text-white shadow-soft' : 'bg-white/70 text-slate-600 hover:bg-white'}`}
+                  className={activeTool === id ? 'active' : ''}
                 >
                   <Icon size={18} />
-                  {label}
+                  <span>{label}</span>
                 </button>
               ))}
             </div>
+            <div className="ai-rail-card">
+              <ShieldCheck size={18} />
+              <p>Guardrails active</p>
+              <span>Medical safety disclaimer attached to every answer.</span>
+            </div>
           </aside>
 
-          <section className="ai-console glass rounded-xl">
-            <div className="flex items-center justify-between border-b border-white/70 px-5 py-4">
-              <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-medical-600 text-white"><Bot size={20} /></span>
-                <div>
-                  <p className="font-bold text-ink">{active.label} assistant</p>
-                  <p className="text-xs text-slate-500">Voice-ready interface with local AI processing</p>
+          <section className="ai-console ai-command-panel ai-care-panel">
+            <div className="ai-console-topbar">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="ai-console-icon"><HeartPulse size={20} /></span>
+                <div className="min-w-0">
+                  <p>{active.label} care mode</p>
+                  <span>Qwen3:8B local reasoning with hospital safety rails</span>
                 </div>
               </div>
-              <button type="button" className="btn-secondary px-3 py-2" title="Voice input ready for browser speech APIs">
-                <Mic size={16} />
-              </button>
-              <button type="button" onClick={clearConversation} className="btn-secondary px-3 py-2" title="Clear conversation">
-                <Eraser size={16} />
-              </button>
+              <div className="ai-console-actions">
+                <span><Gauge size={14} /> Secure local mode</span>
+                <button type="button" title="Voice input ready for browser speech APIs">
+                  <Mic size={16} />
+                </button>
+                <button type="button" onClick={clearConversation} title="Clear conversation">
+                  <Eraser size={16} />
+                </button>
+              </div>
             </div>
 
-            <div ref={scrollRef} className="ai-chat-scroll max-h-[58vh] min-h-[430px] overflow-y-auto px-5 py-5">
+            <div ref={scrollRef} className="ai-chat-scroll ai-message-stage">
               <AnimatePresence initial={false}>
                 {messages.map((message, index) => (
                   <motion.div
                     key={`${message.role}-${index}-${message.text.slice(0, 12)}`}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, y: 14, filter: 'blur(6px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     exit={{ opacity: 0, y: -8 }}
-                    className={`mb-4 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`ai-message-row ${message.role === 'user' ? 'user' : 'assistant'}`}
                   >
-                    <div className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${message.role === 'user' ? 'bg-medical-600 text-white' : message.error ? 'bg-rose-50 text-rose-800 ring-1 ring-rose-100' : 'bg-white/82 text-slate-700 ring-1 ring-white/90'}`}>
+                    <div className={`ai-message-bubble ${message.role === 'user' ? 'user' : message.error ? 'error' : 'assistant'}`}>
                       <AiResponse text={message.text} />
                     </div>
                   </motion.div>
                 ))}
               </AnimatePresence>
               {loading ? (
-                <div className="flex items-center gap-2 rounded-2xl bg-white/76 px-4 py-3 text-sm font-semibold text-slate-500 ring-1 ring-white/90">
-                  <Loader2 size={16} className="animate-spin text-medical-600" />
-                  Gemma is thinking...
+                <div className="ai-thinking">
+                  <Loader2 size={16} className="animate-spin" />
+                  Qwen3:8B is reasoning...
                 </div>
               ) : null}
             </div>
 
-            <div className="border-t border-white/70 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <textarea
-                  className="field min-h-24 flex-1 resize-none"
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      send();
-                    }
-                  }}
-                  placeholder={active.placeholder}
-                />
-                <button type="button" onClick={send} disabled={loading} className="btn-primary self-stretch px-5 disabled:cursor-not-allowed disabled:opacity-60">
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                  Send
-                </button>
-              </div>
-              <p className="mt-3 text-xs font-semibold text-slate-500">{disclaimer}</p>
+            <div className="ai-composer">
+              <textarea
+                className="ai-prompt-input"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder={active.placeholder}
+              />
+              <button type="button" onClick={send} disabled={loading} className="ai-send-button">
+                {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                Send
+              </button>
             </div>
+            <p className="ai-disclaimer">{disclaimer}</p>
           </section>
         </div>
       </div>

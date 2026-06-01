@@ -63,7 +63,7 @@ export default function AiVisitPrep({ patient, doctor, slot, appointmentDate }) 
         <div>
           <span className="inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1 text-xs font-bold uppercase tracking-wider text-medical-700 ring-1 ring-white/80">
             <Sparkles size={14} />
-            Local Gemma AI
+            Local Qwen3 AI
           </span>
           <h3 className="mt-3 text-lg font-bold text-ink">AI visit prep</h3>
           <p className="mt-1 text-sm text-slate-600">

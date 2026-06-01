@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
-import { BrandMark } from '../components/BrandLogo.jsx';
 import { hydrateLocalStore } from '../utils/localStore.js';
 
 const AuthContext = createContext(null);
@@ -102,10 +101,9 @@ export function AuthProvider({ children }) {
 
   if (!isLoaded || booting) {
     return (
-      <div className="grid min-h-screen place-items-center bg-[#f4f8fb] px-4">
-        <div className="cinematic-loader">
-          <BrandMark size="lg" className="cinematic-loader-logo" />
-          <span className="cinematic-loader-ring" />
+      <div className="route-loader-shell min-h-screen">
+        <div className="route-loader">
+          <span />
           <p>Preparing your JK Hospital visit</p>
           <small>Secure session check</small>
         </div>

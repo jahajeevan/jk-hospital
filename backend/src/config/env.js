@@ -6,13 +6,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 
-const parseList = (value, fallback = []) =>
-  String(value || '')
+const parseList = (value, fallback = []) => {
+  const source = value || fallback.join(',');
+  return String(source)
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
-    .concat(fallback)
     .filter((item, index, all) => all.indexOf(item) === index);
+};
 
 const defaultCorsOrigins = [
   process.env.CLIENT_URL || 'http://localhost:5173',
@@ -22,14 +23,14 @@ const defaultCorsOrigins = [
   'http://localhost:8080'
 ];
 
-const requiredInProduction = ['SUPABASE_URL', 'SUPABASE_KEY', 'JWT_SECRET', 'CLERK_SECRET_KEY'];
+const requiredInProduction = ['SUPABASE_URL', 'JWT_SECRET', 'CLERK_SECRET_KEY'];
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
   port: Number(process.env.PORT || 5001),
   supabaseUrl: process.env.SUPABASE_URL,
-  supabaseKey: process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+  supabaseKey: process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY,
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   corsOrigins: parseList(process.env.CORS_ORIGINS, defaultCorsOrigins),
   jwtSecret: process.env.JWT_SECRET,
@@ -46,7 +47,7 @@ export const env = {
   redisUrl: process.env.REDIS_URL,
   sentryDsn: process.env.SENTRY_DSN,
   aiProvider: process.env.AI_PROVIDER || 'ollama',
-  ollamaModel: process.env.OLLAMA_MODEL || 'gemma3:4b',
+  ollamaModel: process.env.OLLAMA_MODEL || 'qwen3:4b',
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
   ollamaTimeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS || 25000),
   ollamaRetries: Number(process.env.OLLAMA_RETRIES || 1),
@@ -59,6 +60,10 @@ export const validateEnv = () => {
   const missing = requiredInProduction.filter((key) => env.isProduction && !process.env[key]);
   if (missing.length) {
     throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  }
+
+  if (env.isProduction && !env.supabaseKey) {
+    throw new Error('Missing required production environment variable: SUPABASE_KEY or SUPABASE_PUBLISHABLE_KEY');
   }
 
   if (!env.jwtSecret || env.jwtSecret.length < 32) {

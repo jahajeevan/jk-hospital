@@ -377,7 +377,7 @@ export const getSlotAvailability = (doctor, slotId, date) => {
     slot,
     booked,
     remaining,
-    isFull: remaining <= 0 || !policy.isBookable,
+    isFull: remaining <= 0,
     isBookable: policy.isBookable,
     reasons: policy.reasons,
     bookingPolicy: policy,

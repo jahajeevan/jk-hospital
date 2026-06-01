@@ -4,9 +4,9 @@ import { ShieldCheck } from 'lucide-react';
 
 export default function ProfilePage() {
   return (
-    <main className="hospital-bg min-h-[calc(100vh-4rem)] py-10">
+    <main className="patient-wow-page min-h-[calc(100vh-4rem)] py-10">
       <div className="container-pad">
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="patient-hero-panel mb-6">
           <p className="flex items-center gap-2 font-semibold text-medical-600">
             <ShieldCheck size={17} /> Secure account
           </p>
@@ -15,7 +15,7 @@ export default function ProfilePage() {
             Manage your JK Hospital identity, email verification, password, Google login, and active sessions.
           </p>
         </motion.div>
-        <section className="glass rounded-2xl p-4">
+        <section className="patient-panel rounded-2xl p-4">
           <UserProfile
             routing="path"
             path="/profile"

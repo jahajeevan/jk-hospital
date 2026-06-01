@@ -1,6 +1,5 @@
 import { Suspense, lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { BrandMark } from './components/BrandLogo.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AppLayout from './layouts/AppLayout.jsx';
 import Home from './pages/Home.jsx';
@@ -20,10 +19,9 @@ const SmartAiPage = lazy(() => import('./pages/SmartAiPage.jsx'));
 
 function ScreenLoader() {
   return (
-    <div className="container-pad grid min-h-[40vh] place-items-center py-16">
-      <div className="cinematic-loader">
-        <BrandMark size="lg" className="cinematic-loader-logo" />
-        <span className="cinematic-loader-ring" />
+    <div className="route-loader-shell">
+      <div className="route-loader">
+        <span />
         <p>Loading JK Hospital</p>
       </div>
     </div>

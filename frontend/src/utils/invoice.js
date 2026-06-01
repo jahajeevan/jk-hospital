@@ -22,13 +22,14 @@ export async function downloadInvoice(appointment) {
   doc.setTextColor(255, 255, 255);
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(14, 10, 18, 18, 4, 4, 'F');
-  doc.setDrawColor(...brand);
-  doc.setLineWidth(1.1);
-  doc.line(18, 19, 21.5, 19);
-  doc.line(21.5, 19, 24, 14);
-  doc.line(24, 14, 28, 24);
-  doc.line(28, 24, 30.5, 19);
-  doc.line(30.5, 19, 34, 19);
+  doc.setFillColor(...brand);
+  doc.triangle(23, 13, 16, 16, 30, 16, 'F');
+  doc.roundedRect(17, 15, 12, 10, 2, 2, 'F');
+  doc.setFillColor(...mint);
+  doc.triangle(27, 18, 32, 14, 29, 25, 'F');
+  doc.setFillColor(255, 255, 255);
+  doc.rect(21, 15.5, 4, 10, 'F');
+  doc.rect(18, 18.5, 10, 4, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);

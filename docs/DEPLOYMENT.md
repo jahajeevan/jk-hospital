@@ -2,12 +2,16 @@
 
 ## Required Environment
 
-- `MONGODB_URI`
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `CLERK_SECRET_KEY`
+- `VITE_CLERK_PUBLISHABLE_KEY`
 - `JWT_SECRET` with at least 32 random characters
 - `CLIENT_URL`
 - `CORS_ORIGINS`
 - Payment keys for Stripe and Razorpay when payment gateways are enabled
 - `REDIS_URL` for queues, Socket.io adapter, reminders, and caching
+- `OLLAMA_MODEL=qwen3:4b` when using the local AI provider
 
 ## Local Production Smoke Test
 
@@ -24,11 +28,10 @@ Open `http://localhost:8080` and verify:
 
 ## Cloud Targets
 
-- Vercel: deploy `frontend`, set `VITE_API_URL` to the backend URL.
-- Render/Railway: deploy `backend/Dockerfile`, attach MongoDB Atlas and Redis.
-- AWS/Azure/GCP: run API containers behind a load balancer, serve frontend via object storage/CDN, and run MongoDB Atlas or managed-compatible MongoDB.
+- Vercel/Netlify: deploy `frontend`, set `VITE_API_URL=https://api.jahajeevan.me/api`.
+- Render/Railway/Fly/VPS: deploy `backend/Dockerfile`, set Supabase, Clerk, Razorpay, email, Redis, and AI environment variables.
+- AWS/Azure/GCP: run API containers behind a load balancer, serve frontend via object storage/CDN, and use Supabase for the production database.
 
 ## Backup
 
-Run `scripts/mongodb-backup.sh` from a secure runner with `MONGODB_URI` and encrypted artifact storage.
-
+Use Supabase scheduled backups/PITR where available. For manual exports, use Supabase dashboard backups or `pg_dump` from a secure runner with encrypted artifact storage.

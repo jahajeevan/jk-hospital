@@ -4,21 +4,21 @@
 
 - [ ] Confirm hospital name, address, phone, emergency number, email, and legal entity.
 - [ ] Replace demo doctors, departments, fees, and slots.
-- [ ] Configure production MongoDB.
+- [ ] Configure production Supabase project.
 - [ ] Configure production payment gateway keys.
 - [ ] Configure production email/SMS credentials.
 - [ ] Configure strong `JWT_SECRET`.
 - [ ] Configure exact `CORS_ORIGINS`.
 - [ ] Configure `CLIENT_URL` with HTTPS domain.
 - [ ] Set `NODE_ENV=production`.
-- [ ] Confirm Ollama `gemma3:4b` is installed on the AI host.
+- [ ] Confirm Ollama `qwen3:4b` is installed on the AI host.
 - [ ] Keep `OLLAMA_BASE_URL` private, preferably `http://127.0.0.1:11434` or private network.
 
 ## Security
 
 - [ ] HTTPS enabled.
 - [ ] Backend not publicly exposing debug stack traces.
-- [ ] MongoDB not publicly open.
+- [ ] Supabase project keys are scoped and stored only in hosting environment variables.
 - [ ] Ollama not publicly open.
 - [ ] Server firewall enabled.
 - [ ] Admin accounts use strong passwords.
@@ -43,7 +43,7 @@
 
 - [ ] Backend starts after reboot.
 - [ ] Frontend serves after reboot.
-- [ ] MongoDB reconnect tested.
+- [ ] Supabase connectivity tested.
 - [ ] Ollama offline behavior tested.
 - [ ] Payment failure behavior tested.
 - [ ] Payment success/token generation tested.

@@ -2,15 +2,24 @@ import { UserButton } from '@clerk/clerk-react';
 import { Activity, Bot, CalendarCheck, LayoutDashboard, LogOut, Mail, Menu, ShieldCheck, Stethoscope, UsersRound, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from './BrandLogo.jsx';
+import { LiquidButton } from './ui/liquid-glass-button';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const liquidNavLabels = new Set(['Home', 'Patient', 'Book', 'AI', 'Doctors', 'Services', 'Contact', 'Admin']);
   const linkClass = ({ isActive }) =>
     `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive ? 'bg-white/60 text-medical-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_24px_rgba(13,99,173,0.1)] ring-1 ring-medical-200/70 backdrop-blur-xl' : 'text-slate-600 hover:bg-white/50 hover:text-medical-700 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] hover:backdrop-blur-xl'}`;
+  const isActivePath = (to) => location.pathname === to;
+  const handleLiquidNav = (to) => {
+    navigate(to);
+    setOpen(false);
+  };
 
   const links = user
     ? [
@@ -48,12 +57,28 @@ export default function Navbar() {
           </span>
         </Link>
         <nav className="hidden min-w-0 items-center gap-1 md:flex">
-          {links.map(([to, Icon, label]) => (
-            <NavLink key={to} to={to} className={linkClass}>
-              <Icon className="mr-2 inline" size={16} />
-              {label}
-            </NavLink>
-          ))}
+          {links.map(([to, Icon, label]) =>
+            liquidNavLabels.has(label) ? (
+              <LiquidButton
+                key={to}
+                type="button"
+                size="sm"
+                className={`liquid-nav-button ${linkClass({ isActive: isActivePath(to) })}`}
+                onClick={() => handleLiquidNav(to)}
+                aria-current={isActivePath(to) ? 'page' : undefined}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Icon size={16} />
+                  {label}
+                </span>
+              </LiquidButton>
+            ) : (
+              <NavLink key={to} to={to} className={linkClass}>
+                <Icon className="mr-2 inline" size={16} />
+                {label}
+              </NavLink>
+            )
+          )}
         </nav>
         <div className="flex shrink-0 items-center gap-2">
           <button type="button" className="rounded-lg border border-white/70 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Menu">
@@ -95,12 +120,28 @@ export default function Navbar() {
             className="overflow-hidden border-t border-slate-200 md:hidden"
           >
             <div className="container-pad flex flex-col gap-2 py-4">
-              {links.map(([to, Icon, label]) => (
-                <NavLink key={to} to={to} className={linkClass} onClick={() => setOpen(false)}>
-                  <Icon className="mr-2 inline" size={16} />
-                  {label}
-                </NavLink>
-              ))}
+              {links.map(([to, Icon, label]) =>
+                liquidNavLabels.has(label) ? (
+                  <LiquidButton
+                    key={to}
+                    type="button"
+                    size="lg"
+                    className={`liquid-nav-button ${linkClass({ isActive: isActivePath(to) })} w-full justify-start`}
+                    onClick={() => handleLiquidNav(to)}
+                    aria-current={isActivePath(to) ? 'page' : undefined}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Icon size={16} />
+                      {label}
+                    </span>
+                  </LiquidButton>
+                ) : (
+                  <NavLink key={to} to={to} className={linkClass} onClick={() => setOpen(false)}>
+                    <Icon className="mr-2 inline" size={16} />
+                    {label}
+                  </NavLink>
+                )
+              )}
               {user ? (
                 <button onClick={logout} className="btn-secondary w-full">Logout</button>
               ) : (

@@ -124,9 +124,9 @@ export default function Dashboard() {
   };
 
   return (
-    <main className="hospital-bg min-h-[calc(100vh-4rem)] py-10">
+    <main className="patient-wow-page min-h-[calc(100vh-4rem)] py-10">
       <div className="container-pad">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="patient-hero-panel flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="live-badge">Patient portal</span>
             <h1 className="mt-4 text-4xl font-bold">Hello, {user?.name}</h1>
@@ -145,7 +145,7 @@ export default function Dashboard() {
 
         {tab === 'overview' && (
           <>
-            <div className="mt-8 grid gap-4 md:grid-cols-4">
+            <div className="patient-metric-grid mt-8 grid gap-4 md:grid-cols-4">
               <MetricCard label="Total visits" value={appointments.length} />
               <MetricCard label="Upcoming" value={upcoming.length} tone="green" />
               <MetricCard label="Active token" value={active?.tokenNumber || '—'} tone="amber" />
@@ -173,7 +173,7 @@ export default function Dashboard() {
                 <StatusBadge status={active.status} />
               </motion.div>
             ) : (
-              <div className="glass mt-8 rounded-xl p-8 text-center">
+              <div className="patient-empty-card mt-8 rounded-xl p-8 text-center">
                 <Stethoscope className="mx-auto text-medical-600" size={32} />
                 <p className="mt-3 font-bold">No active appointment</p>
                 <p className="mt-1 text-sm text-slate-500">Book your first token to see live queue status here.</p>
@@ -182,7 +182,7 @@ export default function Dashboard() {
             )}
 
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <section className="glass rounded-xl p-5">
+              <section className="patient-panel rounded-xl p-5">
                 <h2 className="text-lg font-bold">Visit checklist</h2>
                 <ul className="mt-4 space-y-2 text-sm text-slate-600">
                   {checklist.map((item) => (
@@ -190,7 +190,7 @@ export default function Dashboard() {
                   ))}
                 </ul>
               </section>
-              <section className="glass rounded-xl p-5">
+              <section className="patient-panel rounded-xl p-5">
                 <div className="flex items-center gap-2"><Bell size={18} className="text-medical-600" /><h2 className="text-lg font-bold">Recent timeline</h2></div>
                 <div className="mt-4 space-y-3">
                   {(active?.timeline || appointments[0]?.timeline || [{ label: 'No activity yet', at: new Date().toISOString() }]).map((event) => (
@@ -203,7 +203,7 @@ export default function Dashboard() {
               </section>
             </div>
 
-            <section className="glass mt-8 rounded-xl p-5">
+            <section className="patient-panel mt-8 rounded-xl p-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                   <span className="grid h-11 w-11 place-items-center rounded-xl bg-medical-600 text-white"><Bot size={20} /></span>
@@ -221,7 +221,7 @@ export default function Dashboard() {
         )}
 
         {tab === 'appointments' && (
-          <section className="glass mt-8 rounded-xl p-5">
+          <section className="patient-panel mt-8 rounded-xl p-5">
             <div className="flex items-center gap-2"><CalendarClock className="text-medical-600" /><h2 className="text-xl font-bold">All appointments</h2></div>
             {!appointments.length && <p className="mt-6 text-slate-500">No appointments yet.</p>}
             <div className="mt-6 grid gap-4">
@@ -250,7 +250,7 @@ export default function Dashboard() {
 
         {tab === 'records' && (
           <div className="mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-            <section className="glass rounded-xl p-5">
+            <section className="patient-panel rounded-xl p-5">
               <div className="flex items-center gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-medical-600 text-white"><Sparkles size={20} /></span>
                 <div>
@@ -295,7 +295,7 @@ export default function Dashboard() {
               ) : null}
             </section>
 
-            <section className="glass rounded-xl p-5">
+            <section className="patient-panel rounded-xl p-5">
               <div className="flex items-center gap-2"><FileText className="text-medical-600" /><h2 className="text-xl font-bold">Saved medical records</h2></div>
               <div className="mt-5 space-y-4">
                 {!records.length && (
@@ -324,7 +324,7 @@ export default function Dashboard() {
 
         {tab === 'refunds' && (
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
-            <section className="glass rounded-xl p-5">
+            <section className="patient-panel rounded-xl p-5">
               <h2 className="text-xl font-bold">Submit refund request</h2>
               <select className="field mt-4" value={refundForm.appointmentId} onChange={(e) => setRefundForm((v) => ({ ...v, appointmentId: e.target.value }))}>
                 <option value="">Select paid appointment</option>
@@ -336,7 +336,7 @@ export default function Dashboard() {
               <textarea className="field mt-3" rows={2} placeholder="Emergency details (optional)" value={refundForm.emergencyExplanation} onChange={(e) => setRefundForm((v) => ({ ...v, emergencyExplanation: e.target.value }))} />
               <button type="button" className="btn-primary mt-4 w-full" onClick={submitRefund}>Submit request</button>
             </section>
-            <section className="glass rounded-xl p-5">
+            <section className="patient-panel rounded-xl p-5">
               <h2 className="text-xl font-bold">Your refund requests</h2>
               <div className="mt-4 space-y-3">
                 {!refunds.length && <p className="text-sm text-slate-500">No refund requests yet.</p>}

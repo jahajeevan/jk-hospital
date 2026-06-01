@@ -1,6 +1,6 @@
 # Keeping Ollama Live
 
-The AI works only when Ollama is running and serving `gemma3:4b` on port `11434`.
+The AI works only when Ollama is running and serving `qwen3:4b` on port `11434`.
 
 ## Local Development On Your Mac
 
@@ -16,10 +16,10 @@ In another terminal, confirm the model is installed:
 ollama list
 ```
 
-If `gemma3:4b` is missing:
+If `qwen3:4b` is missing:
 
 ```bash
-ollama pull gemma3:4b
+ollama pull qwen3:4b
 ```
 
 Test the local API:
@@ -27,7 +27,7 @@ Test the local API:
 ```bash
 curl http://127.0.0.1:11434/api/generate \
   -H "Content-Type: application/json" \
-  -d '{"model":"gemma3:4b","prompt":"Reply OK only.","stream":false}'
+  -d '{"model":"qwen3:4b","prompt":"Reply OK only.","stream":false}'
 ```
 
 ## Easiest Mac Option
@@ -48,7 +48,7 @@ Then set backend production env:
 
 ```env
 AI_PROVIDER=ollama
-OLLAMA_MODEL=gemma3:4b
+OLLAMA_MODEL=qwen3:4b
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 ```
 

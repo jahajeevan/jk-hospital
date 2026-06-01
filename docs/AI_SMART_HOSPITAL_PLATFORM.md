@@ -5,7 +5,7 @@
 Backend AI defaults to local Ollama:
 
 ```bash
-ollama pull gemma3:4b
+ollama pull qwen3:4b
 ollama serve
 npm run dev
 ```
@@ -14,12 +14,13 @@ Required backend environment:
 
 ```env
 AI_PROVIDER=ollama
-OLLAMA_MODEL=gemma3:4b
+OLLAMA_MODEL=qwen3:4b
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_TIMEOUT_MS=25000
 OLLAMA_RETRIES=1
 JWT_SECRET=replace_with_a_32_plus_character_secret
-MONGODB_URI=mongodb://localhost:27017/jk-hospital
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_supabase_service_role_key
 ```
 
 Provider switching is handled by `AI_PROVIDER`. `ollama` is active now; `gemini` is scaffolded for future hosted provider fallback.
@@ -81,5 +82,5 @@ curl -X POST http://localhost:5001/api/ai/appointment-assist \
 
 - For VPS or cloud deployment, keep `AI_PROVIDER=ollama` and point `OLLAMA_BASE_URL` to a private hosted Ollama server.
 - Restrict CORS using `CORS_ORIGINS`.
-- Use a strong `JWT_SECRET`, production MongoDB URI, HTTPS reverse proxy, process manager, and the existing Docker/PM2 assets.
+- Use a strong `JWT_SECRET`, production Supabase project, HTTPS reverse proxy, process manager, and the existing Docker/PM2 assets.
 - Do not expose Ollama directly to the public internet; place it behind the backend or a private network.

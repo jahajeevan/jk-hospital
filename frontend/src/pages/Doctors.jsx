@@ -1,6 +1,5 @@
-import { Search } from 'lucide-react';
+import { Award, CalendarCheck, Search, Sparkles, UsersRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import CinematicHero from '../components/CinematicHero.jsx';
 import DoctorCard from '../components/DoctorCard.jsx';
 import Reveal from '../components/Reveal.jsx';
 import { getLocalDoctors } from '../utils/localStore.js';
@@ -26,21 +25,21 @@ export default function Doctors() {
   );
 
   return (
-    <main>
-      <CinematicHero
-        image="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=1800&q=82"
-        alt="JK Hospital doctors"
-        minHeight="min-h-[48vh]"
-        eyebrow={<span className="live-badge mb-4">Live schedules</span>}
-        title={<h1 className="text-5xl font-bold">Meet our specialists</h1>}
-        subtitle={
-          <p className="mt-4 max-w-2xl text-lg text-slate-600">
-            Compare live token availability, consultation fees, and OP timings before you book.
-          </p>
-        }
-      />
-      <section className="container-pad -mt-12 pb-16">
-        <Reveal className="glass rounded-xl p-4">
+    <main className="doctors-wow-page">
+      <section className="doctors-hero">
+        <div className="container-pad">
+          <span className="live-badge">Live specialist schedules</span>
+          <h1>Meet the doctors behind JK Hospital</h1>
+          <p>Compare live token availability, consultation fees, OP timings, and specialities before booking.</p>
+          <div className="doctors-hero-stats">
+            <span><UsersRound size={18} /> {doctors.length} specialists</span>
+            <span><CalendarCheck size={18} /> Live OP tokens</span>
+            <span><Award size={18} /> Trusted care</span>
+          </div>
+        </div>
+      </section>
+      <section className="container-pad doctors-content">
+        <Reveal className="doctor-filter-panel">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <label className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />

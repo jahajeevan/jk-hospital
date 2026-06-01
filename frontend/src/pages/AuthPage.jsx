@@ -1,9 +1,10 @@
 import { SignIn, SignUp, useUser } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
-import { Activity, MailCheck, ShieldCheck, Sparkles, UserPlus, Lock } from 'lucide-react';
+import { MailCheck, ShieldCheck, Sparkles, UserPlus, Lock } from 'lucide-react';
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
+import BrandLogo from '../components/BrandLogo.jsx';
 
 const perks = [
   { icon: MailCheck, title: 'Email OTP', desc: 'Verified by Clerk' },
@@ -73,11 +74,8 @@ export default function AuthPage({ mode }) {
           </div>
           <div className="auth-visual-overlay" />
           <div className="auth-visual-content">
-            <Link to="/" className="inline-flex items-center gap-2 text-white/90 transition hover:text-white">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 backdrop-blur">
-                <Activity size={20} />
-              </span>
-              <span className="font-bold">JK Hospital</span>
+            <Link to="/" className="auth-brand-link transition hover:scale-[1.01]">
+              <BrandLogo markSize="lg" />
             </Link>
             <div className="mt-auto">
               <span className="auth-visual-badge">{isSignup ? 'Create secure access' : 'Welcome back'}</span>

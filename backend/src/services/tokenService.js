@@ -88,7 +88,7 @@ export const getSlotAvailability = async (doctor, date, slotId) => {
     totalTokens: slot.tokenLimit,
     bookedTokens,
     remainingTokens,
-    isFull: remainingTokens <= 0 || !policy.isBookable,
+    isFull: remainingTokens <= 0,
     isBookable: policy.isBookable,
     bookingPolicy: {
       reasons: policy.reasons,

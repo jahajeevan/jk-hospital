@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Bot, Calendar, CheckCircle2, CreditCard, IndianRupee, Loader2, Sparkles, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bot, Calendar, CheckCircle2, Clock3, CreditCard, IndianRupee, Loader2, Lock, Sparkles, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -127,19 +127,28 @@ export default function BookingPage() {
   };
 
   return (
-    <main className="hospital-bg min-h-[calc(100vh-4rem)] py-10">
+    <main className="booking-experience-page min-h-[calc(100vh-4rem)] py-10">
       <div className="container-pad">
-        <span className="live-badge">Appointment booking</span>
-        <h1 className="mt-4 text-4xl font-bold">Book your hospital token</h1>
-        <p className="mt-2 max-w-2xl text-slate-600">Complete each step — your summary updates live on the right.</p>
+        <section className="booking-hero-panel">
+          <div>
+            <span className="live-badge">Appointment booking</span>
+            <h1>Book your hospital token</h1>
+            <p>Choose a doctor, pick a valid OP slot, add patient details, and confirm with a live queue summary.</p>
+          </div>
+          <div className="booking-rule-card">
+            <Clock3 size={22} />
+            <strong>60-minute rule</strong>
+            <span>Same-day tokens close one hour before the selected slot starts.</span>
+          </div>
+        </section>
 
-        <div className="mt-6 liquid-glass liquid-glass-interactive rounded-xl p-4">
+        <div className="booking-ai-strip">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="flex items-start gap-3 lg:w-72">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-medical-600 text-white"><Bot size={20} /></span>
               <div>
                 <p className="flex items-center gap-2 font-bold text-ink"><Sparkles size={16} className="text-medical-600" /> AI appointment assistant</p>
-                <p className="text-sm text-slate-500">Describe the appointment and Gemma will prefill what it can.</p>
+                <p className="text-sm text-slate-500">Describe the appointment and Qwen3 will prefill what it can.</p>
               </div>
             </div>
             <input
@@ -155,12 +164,12 @@ export default function BookingPage() {
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 booking-stepper-wrap">
           <BookingStepper steps={STEPS} current={step} />
         </div>
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-          <section className="liquid-glass rounded-xl p-6">
+          <section className="booking-main-card">
             <AnimatePresence mode="wait">
               <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
                 {step === 0 && (
@@ -177,7 +186,7 @@ export default function BookingPage() {
                             const nextSlot = item.slots.find((s) => s.isActive !== false);
                             if (nextSlot) setSlotId(nextSlot._id);
                           }}
-                          className={`liquid-option rounded-xl border p-4 text-left transition ${doctorId === item._id ? 'liquid-option-active' : ''} ${item.isAvailable === false ? 'cursor-not-allowed opacity-60' : ''}`}
+                          className={`booking-select-card text-left transition ${doctorId === item._id ? 'active' : ''} ${item.isAvailable === false ? 'cursor-not-allowed opacity-60' : ''}`}
                         >
                           <p className="font-bold">{item.name}</p>
                           <p className="text-sm text-medical-600">{item.specialty}</p>
@@ -202,13 +211,19 @@ export default function BookingPage() {
                           <button
                             key={item._id}
                             type="button"
-                            onClick={() => setSlotId(item._id)}
-                            className={`liquid-option rounded-xl border p-4 text-left ${slotId === item._id ? 'liquid-option-active' : ''} ${!info.isBookable || info.isFull ? 'liquid-option-blocked' : ''}`}
+                            onClick={() => {
+                              if (!info.isBookable || info.isFull) {
+                                toast.error(slotBlockedMessage(info.reasons?.[0] || (info.isFull ? 'Selected slot is full' : 'Selected slot is not bookable now')));
+                                return;
+                              }
+                              setSlotId(item._id);
+                            }}
+                            className={`booking-slot-card ${slotId === item._id ? 'active' : ''} ${!info.isBookable || info.isFull ? 'locked' : ''}`}
                           >
                             <div className="flex justify-between gap-2">
                               <span className="font-bold">{item.label}</span>
                               <span className={info.remaining && info.isBookable ? 'text-emerald-600' : 'text-rose-600'}>
-                                {info.remaining && info.isBookable ? `${info.remaining} left` : info.reasons?.[0] || 'Full'}
+                                {info.remaining && info.isBookable ? `${info.remaining} left` : <span className="inline-flex items-center gap-1"><Lock size={13} /> Locked</span>}
                               </span>
                             </div>
                             <p className="mt-1 text-sm text-slate-500">{item.startTime} – {item.endTime}</p>
@@ -216,6 +231,7 @@ export default function BookingPage() {
                               Available {item.availableFrom || 'today'} to {item.availableUntil || 'until changed'} · book {item.advanceBookingMinutes ?? 60} min before start
                             </p>
                             <p className="mt-1 text-xs text-slate-400">Est. wait ~{info.estimatedWaitMinutes} min if you book now</p>
+                            {info.reasons?.[0] ? <p className="mt-2 text-xs font-bold text-amber-700">{info.reasons[0]}</p> : null}
                           </button>
                         );
                       })}
@@ -256,7 +272,7 @@ export default function BookingPage() {
                         ['Phone', patient.phone],
                         ['Fee', `INR ${consultationFee}`]
                       ].map(([label, value]) => (
-                        <li key={label} className="liquid-row flex justify-between gap-4 rounded-lg px-4 py-3">
+                        <li key={label} className="booking-review-row flex justify-between gap-4 rounded-lg px-4 py-3">
                           <span className="text-slate-500">{label}</span>
                           <span className="font-bold text-right">{value}</span>
                         </li>
