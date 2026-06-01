@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Footer from '../components/Footer.jsx';
 import Navbar from '../components/Navbar.jsx';
@@ -8,11 +9,15 @@ import { page3D } from '../utils/motion.js';
 export default function AppLayout() {
   const location = useLocation();
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
+
   return (
-    <motion.div className="page-shell scene-3d">
+    <motion.div className="page-shell">
       <ScrollProgress />
       <Navbar />
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={location.pathname}
           className="page-route-shell"

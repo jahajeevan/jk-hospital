@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
+  Bot,
   CalendarCheck,
   ChevronRight,
   Clock3,
@@ -81,7 +82,7 @@ export default function Home() {
           />
         </motion.div>
         <motion.div className="landing-hero-mesh" aria-hidden="true" />
-        <motion.div className="container-pad relative z-10 flex min-h-[88vh] items-center py-16 lg:py-24">
+        <motion.div className="landing-hero-shell container-pad relative z-10 flex min-h-[88vh] items-center py-16 lg:py-24">
           <motion.div
             className="hero-copy mx-auto max-w-4xl text-center lg:mx-0 lg:text-left"
             initial="hidden"
@@ -99,18 +100,21 @@ export default function Home() {
             <motion.p variants={fadeUp} className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-white/85 lg:mx-0">
               Book your token in minutes. Pay online. Track your queue. Download a professional invoice — all from one beautiful patient dashboard.
             </motion.p>
-            <motion.div variants={fadeUp} className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:justify-start justify-center">
+            <motion.div variants={fadeUp} className="hero-actions mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:justify-start justify-center">
               <Link to="/book" className="btn-primary btn-lg btn-glow">
                 Book a token <CalendarCheck size={18} />
               </Link>
               <Link to="/signup" className="btn-ghost-light btn-lg">
                 Get started free <ArrowRight size={18} />
               </Link>
+              <Link to="/ai" className="btn-ghost-light btn-lg">
+                Ask local AI <Bot size={18} />
+              </Link>
               <a href="tel:7845265507" className="btn-ghost-light btn-lg sm:hidden">
                 <Phone size={18} /> Emergency
               </a>
             </motion.div>
-            <motion.div variants={fadeUp} className="mt-10 flex flex-wrap gap-8 text-sm text-white/75 lg:justify-start justify-center">
+            <motion.div variants={fadeUp} className="hero-stats mt-10 flex flex-wrap gap-8 text-sm text-white/75 lg:justify-start justify-center">
               {[
                 ['42k+', 'Patients served'],
                 ['98%', 'Wait clarity'],
@@ -122,7 +126,7 @@ export default function Home() {
                 </div>
               ))}
             </motion.div>
-            <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-2 lg:justify-start justify-center">
+            <motion.div variants={fadeUp} className="hero-chips mt-8 flex flex-wrap gap-2 lg:justify-start justify-center">
               {['Secure payments', 'Live tokens', 'Digital invoices'].map((chip) => (
                 <span key={chip} className="hero-chip">
                   <ShieldCheck size={14} /> {chip}
@@ -136,12 +140,12 @@ export default function Home() {
       {/* ——— TRUST STRIP ——— */}
       <section className="border-y border-slate-200/80 bg-white py-5">
         <motion.div
-          className="container-pad flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm font-semibold text-slate-600"
+          className="trust-strip container-pad flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm font-semibold text-slate-600"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
         >
-          {['Razorpay verified payments', 'Encrypted patient records', 'PDF invoices', 'Refund requests'].map((item) => (
+          {['Local Gemma AI assistant', 'Razorpay verified payments', 'Encrypted patient records', 'PDF invoices', 'Refund requests'].map((item) => (
             <span key={item} className="inline-flex items-center gap-2">
               <ShieldCheck size={16} className="text-emerald-500" /> {item}
             </span>
@@ -150,7 +154,7 @@ export default function Home() {
       </section>
 
       {/* ——— GALLERY MARQUEE ——— */}
-      <section className="overflow-hidden bg-slate-950 py-6">
+      <section className="gallery-strip overflow-hidden bg-slate-950 py-6">
         <div className="video-strip-track opacity-90">
           {[...galleryImages, ...galleryImages].map((image, index) => (
             <img key={`${image}-${index}`} src={image} alt="" className="h-32 w-52 shrink-0 rounded-xl object-cover ring-1 ring-white/10" />

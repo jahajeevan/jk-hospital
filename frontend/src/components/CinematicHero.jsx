@@ -1,5 +1,5 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 export default function CinematicHero({
   image,
@@ -12,6 +12,7 @@ export default function CinematicHero({
   minHeight = 'min-h-[82vh]'
 }) {
   const ref = useRef(null);
+  const [imageFailed, setImageFailed] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
   const y = useTransform(scrollYProgress, [0, 1], ['0%', '22%']);
   const scale = useTransform(scrollYProgress, [0, 1], [1.08, 1.18]);
@@ -20,7 +21,11 @@ export default function CinematicHero({
   return (
     <section ref={ref} className={`cinematic-hero relative overflow-hidden ${minHeight}`}>
       <motion.div className="absolute inset-0" style={{ y, scale, opacity }}>
-        <img src={image} alt={alt} className="cinematic-hero-media h-full w-full object-cover" />
+        {image && !imageFailed ? (
+          <img src={image} alt={alt} className="cinematic-hero-media h-full w-full object-cover" onError={() => setImageFailed(true)} />
+        ) : (
+          <div className="cinematic-hero-fallback h-full w-full" aria-label={alt} />
+        )}
       </motion.div>
       <motion.div
         className="cinematic-hero-scan absolute inset-0"

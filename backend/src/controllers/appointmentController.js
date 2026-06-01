@@ -1,8 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import Appointment from '../models/Appointment.js';
-import Doctor from '../models/Doctor.js';
-import Notification from '../models/Notification.js';
-import Payment from '../models/Payment.js';
+import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
 import { sendAppointmentEmail, sendMail, sendStatusEmail } from '../services/emailService.js';
 import { createInvoiceBuffer } from '../services/invoiceService.js';
 import { allocateToken, normalizeAppointmentDate } from '../services/tokenService.js';
@@ -10,12 +7,19 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { HOSPITAL } from '../utils/constants.js';
 
 const getSlotFee = (doctor, slotId) => {
-  const slot = doctor.slots.id(slotId);
+  const slot = doctor.slots?.find((s) => String(s._id || s.id) === String(slotId));
   return slot?.fee ?? doctor.fee ?? HOSPITAL.consultationFee;
 };
 
 export const createConfirmedAppointment = async ({ user, doctorId, slotId, appointmentDate, patientDetails, payment, paymentInput }) => {
-  const doctor = await Doctor.findById(doctorId);
+  const { data: doctors } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .eq('id', doctorId)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const doctor = toCamelObj(doctors?.[0]);
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;
@@ -23,13 +27,19 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
   }
 
   const normalizedAppointmentDate = normalizeAppointmentDate(appointmentDate);
-  const duplicate = await Appointment.findOne({
-    patient: user._id,
-    doctor: doctor._id,
-    appointmentDate: normalizedAppointmentDate,
-    slotId,
-    status: { $nin: ['cancelled', 'rejected'] }
-  });
+  
+  const { data: duplicates } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('patient_id', user._id)
+    .eq('doctor_id', doctor._id)
+    .eq('appointment_date', normalizedAppointmentDate.toISOString().slice(0, 10))
+    .eq('slot_id', slotId)
+    .not('status', 'in', '("cancelled","rejected")')
+    .is('deleted_at', null)
+    .limit(1);
+
+  const duplicate = toCamelObj(duplicates?.[0]);
   if (duplicate) {
     const error = new Error('Duplicate booking for this doctor, date, and slot is not allowed');
     error.statusCode = 409;
@@ -37,37 +47,64 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
   }
 
   const token = await allocateToken(doctor, normalizedAppointmentDate, slotId);
-  const paid = payment || await Payment.create({
-    patient: user._id,
-    amount: paymentInput?.amount || getSlotFee(doctor, slotId),
-    method: paymentInput?.method || 'upi',
-    upiId: HOSPITAL.upiId,
-    transactionId: paymentInput?.transactionId || `JKH-${uuid().slice(0, 12).toUpperCase()}`,
-    status: 'success',
-    currency: paymentInput?.currency || 'INR',
-    stripeSessionId: paymentInput?.stripeSessionId,
-    stripePaymentIntentId: paymentInput?.stripePaymentIntentId
-  });
+  
+  let paid = payment;
+  if (!paid) {
+    const { data: newPayments, error: paymentError } = await supabase
+      .from('payments')
+      .insert(toSnakeObj({
+        patient: user._id,
+        amount: paymentInput?.amount || getSlotFee(doctor, slotId),
+        method: paymentInput?.method || 'upi',
+        upiId: HOSPITAL.upiId,
+        transactionId: paymentInput?.transactionId || `JKH-${uuid().slice(0, 12).toUpperCase()}`,
+        status: 'success',
+        currency: paymentInput?.currency || 'INR',
+        stripeSessionId: paymentInput?.stripeSessionId,
+        stripePaymentIntentId: paymentInput?.stripePaymentIntentId
+      }))
+      .select('*');
 
-  const appointment = await Appointment.create({
-    patient: user._id,
-    doctor: doctor._id,
-    appointmentDate: normalizedAppointmentDate,
-    slotId,
-    slotLabel: token.slot.label,
-    tokenNumber: token.tokenNumber,
-    queuePosition: token.queuePosition,
-    estimatedWaitMinutes: token.estimatedWaitMinutes,
-    patientDetails: { ...patientDetails, email: user.email },
-    payment: paid._id,
-    invoiceNumber: `INV-${Date.now()}`
-  });
+    if (paymentError) throw paymentError;
+    paid = toCamelObj(newPayments?.[0]);
+  }
 
-  paid.appointment = appointment._id;
-  await paid.save();
+  const { data: newAppointments, error: appointmentError } = await supabase
+    .from('appointments')
+    .insert(toSnakeObj({
+      patient: user._id,
+      doctor: doctor._id,
+      appointmentDate: normalizedAppointmentDate.toISOString().slice(0, 10),
+      slotId,
+      slotLabel: token.slot.label,
+      tokenNumber: token.tokenNumber,
+      queuePosition: token.queuePosition,
+      estimatedWaitMinutes: token.estimatedWaitMinutes,
+      patientDetails: { ...patientDetails, email: user.email },
+      paymentId: paid._id,
+      invoiceNumber: `INV-${Date.now()}`
+    }))
+    .select('*');
 
-  const populated = await Appointment.findById(appointment._id).populate('doctor').populate('payment');
+  if (appointmentError) throw appointmentError;
+  const appointment = toCamelObj(newAppointments?.[0]);
+
+  // Backlink appointment to payment
+  await supabase
+    .from('payments')
+    .update({ appointment_id: appointment._id })
+    .eq('id', paid._id);
+
+  // Fetch populated appointment
+  const { data: populatedData } = await supabase
+    .from('appointments')
+    .select('*, doctor:doctors(*), payment:payments(*)')
+    .eq('id', appointment._id)
+    .limit(1);
+
+  const populated = toCamelObj(populatedData?.[0]);
   const invoiceBuffer = await createInvoiceBuffer(populated, paid);
+  
   await sendAppointmentEmail(user.email, populated);
   await sendMail({
     to: user.email,
@@ -76,12 +113,14 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     attachments: [{ filename: `${appointment.invoiceNumber}.pdf`, content: invoiceBuffer }]
   });
 
-  await Notification.create({
-    user: user._id,
-    title: 'Appointment confirmed',
-    message: `Token ${appointment.tokenNumber} confirmed with ${doctor.name}.`,
-    type: 'appointment'
-  });
+  await supabase
+    .from('notifications')
+    .insert(toSnakeObj({
+      user: user._id,
+      title: 'Appointment confirmed',
+      message: `Token ${appointment.tokenNumber} confirmed with ${doctor.name}.`,
+      type: 'appointment'
+    }));
 
   return populated;
 };
@@ -108,34 +147,72 @@ export const createAppointment = asyncHandler(async (req, res) => {
 });
 
 export const myAppointments = asyncHandler(async (req, res) => {
-  const appointments = await Appointment.find({ patient: req.user._id })
-    .populate('doctor')
-    .populate('payment')
-    .sort({ appointmentDate: -1, createdAt: -1 });
+  const { data: myAptsData } = await supabase
+    .from('appointments')
+    .select('*, doctor:doctors(*), payment:payments(*)')
+    .eq('patient_id', req.user._id)
+    .is('deleted_at', null)
+    .order('appointment_date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  const appointments = toCamelObj(myAptsData) || [];
   res.json({ appointments });
 });
 
 export const cancelAppointment = asyncHandler(async (req, res) => {
-  const appointment = await Appointment.findOne({ _id: req.params.id, patient: req.user._id }).populate('doctor');
+  const { data: apts } = await supabase
+    .from('appointments')
+    .select('*, doctor:doctors(*)')
+    .eq('id', req.params.id)
+    .eq('patient_id', req.user._id)
+    .limit(1);
+
+  let appointment = toCamelObj(apts?.[0]);
   if (!appointment) {
     const error = new Error('Appointment not found');
     error.statusCode = 404;
     throw error;
   }
-  appointment.status = 'cancelled';
-  appointment.cancellation = {
-    reason: req.body.reason,
-    emergencyExplanation: req.body.emergencyExplanation,
-    cancelledAt: new Date()
-  };
-  await appointment.save();
+
+  const { data: updatedApts, error: updateError } = await supabase
+    .from('appointments')
+    .update(toSnakeObj({
+      status: 'cancelled',
+      cancellation: {
+        reason: req.body.reason,
+        emergencyExplanation: req.body.emergencyExplanation,
+        cancelledAt: new Date()
+      }
+    }))
+    .eq('id', appointment._id)
+    .select('*, doctor:doctors(*)');
+
+  if (updateError) throw updateError;
+  appointment = toCamelObj(updatedApts?.[0]);
+
   await sendStatusEmail(req.user.email, 'JK Hospital Appointment Cancelled', 'Your appointment was cancelled. You may submit a refund request from your dashboard.');
   res.json({ appointment });
 });
 
 export const rescheduleAppointment = asyncHandler(async (req, res) => {
-  const appointment = await Appointment.findOne({ _id: req.params.id, patient: req.user._id });
-  const doctor = await Doctor.findById(req.body.doctorId || appointment?.doctor);
+  const { data: apts } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('id', req.params.id)
+    .eq('patient_id', req.user._id)
+    .limit(1);
+    
+  let appointment = toCamelObj(apts?.[0]);
+  const doctorId = req.body.doctorId || appointment?.doctor;
+  
+  const { data: doctors } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .eq('id', doctorId)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const doctor = toCamelObj(doctors?.[0]);
   if (!appointment || !doctor) {
     const error = new Error('Appointment or doctor not found');
     error.statusCode = 404;
@@ -144,22 +221,35 @@ export const rescheduleAppointment = asyncHandler(async (req, res) => {
 
   const appointmentDate = normalizeAppointmentDate(req.body.appointmentDate);
   const token = await allocateToken(doctor, appointmentDate, req.body.slotId);
-  appointment.doctor = doctor._id;
-  appointment.appointmentDate = appointmentDate;
-  appointment.slotId = req.body.slotId;
-  appointment.slotLabel = token.slot.label;
-  appointment.tokenNumber = token.tokenNumber;
-  appointment.queuePosition = token.queuePosition;
-  appointment.estimatedWaitMinutes = token.estimatedWaitMinutes;
-  appointment.status = 'rescheduled';
-  await appointment.save();
-  res.json({ appointment });
+
+  const { data: updatedApts, error: updateError } = await supabase
+    .from('appointments')
+    .update(toSnakeObj({
+      doctorId: doctor._id,
+      appointmentDate: appointmentDate.toISOString().slice(0, 10),
+      slotId: req.body.slotId,
+      slotLabel: token.slot.label,
+      tokenNumber: token.tokenNumber,
+      queuePosition: token.queuePosition,
+      estimatedWaitMinutes: token.estimatedWaitMinutes,
+      status: 'rescheduled'
+    }))
+    .eq('id', appointment._id)
+    .select('*');
+
+  if (updateError) throw updateError;
+  res.json({ appointment: toCamelObj(updatedApts?.[0]) });
 });
 
 export const downloadInvoice = asyncHandler(async (req, res) => {
-  const appointment = await Appointment.findOne({ _id: req.params.id, patient: req.user._id })
-    .populate('doctor')
-    .populate('payment');
+  const { data: apts } = await supabase
+    .from('appointments')
+    .select('*, doctor:doctors(*), payment:payments(*)')
+    .eq('id', req.params.id)
+    .eq('patient_id', req.user._id)
+    .limit(1);
+
+  const appointment = toCamelObj(apts?.[0]);
   if (!appointment) {
     const error = new Error('Appointment not found');
     error.statusCode = 404;

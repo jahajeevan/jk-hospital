@@ -4,6 +4,7 @@ import { migratePlainKey, secureGet, secureSet } from './secureStore.js';
 
 const DOCTORS_KEY = 'jk_local_doctors';
 const BOOKINGS_KEY = 'jk_local_bookings';
+const MEDICAL_RECORDS_KEY = 'jk_medical_records';
 const VERSION_KEY = 'jk_local_version';
 const STORE_VERSION = '6';
 
@@ -14,6 +15,9 @@ let hydrated = false;
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const isPlaceholderDoctor = (doctor) =>
+  doctor?.name === 'Dr. New Doctor' ||
+  doctor?.bio === 'Add a short doctor profile for patients.';
 
 const normalizeSlot = (slot, doctorFee) => ({
   ...slot,
@@ -25,13 +29,16 @@ const normalizeSlot = (slot, doctorFee) => ({
   bookedTokens: Math.min(Math.max(Number(slot.bookedTokens ?? 0), 0), Math.max(Number(slot.tokenLimit ?? 10), 0)),
   fee: normalizeFee(slot.fee, doctorFee),
   isActive: slot.isActive ?? true,
-  date: slot.date || ''
+  date: slot.date || '',
+  availableFrom: slot.availableFrom || '',
+  availableUntil: slot.availableUntil || '',
+  advanceBookingMinutes: Math.max(Number(slot.advanceBookingMinutes ?? 60), 0)
 });
 
 const normalizeDoctor = (doctor) => ({
   ...doctor,
   _id: doctor._id || makeId('doc'),
-  name: doctor.name || 'Dr. New Doctor',
+  name: doctor.name || 'Unnamed doctor',
   specialty: doctor.specialty || 'General Physician',
   bio: doctor.bio || 'Patient-focused healthcare professional.',
   avatar: doctor.avatar || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80',
@@ -52,7 +59,7 @@ export const hydrateLocalStore = async () => {
     localStorage.setItem(VERSION_KEY, STORE_VERSION);
   }
 
-  doctorsCache = (await secureGet(DOCTORS_KEY))?.map(normalizeDoctor) || seedDoctors();
+  doctorsCache = ((await secureGet(DOCTORS_KEY))?.map(normalizeDoctor) || seedDoctors()).filter((doctor) => !isPlaceholderDoctor(doctor));
   bookingsCache = (await secureGet(BOOKINGS_KEY)) || [];
   await persistDoctors();
   await persistBookings();
@@ -80,7 +87,7 @@ export const getLocalDoctors = () => {
 };
 
 export const saveLocalDoctors = (doctors) => {
-  doctorsCache = doctors.map(normalizeDoctor);
+  doctorsCache = doctors.map(normalizeDoctor).filter((doctor) => !isPlaceholderDoctor(doctor));
   void persistDoctors();
 };
 
@@ -106,28 +113,18 @@ export const saveLocalDoctor = (doctorInput) => {
   return doctor;
 };
 
-export const addLocalDoctor = () =>
+export const createLocalDoctor = (doctorInput) =>
   saveLocalDoctor({
     _id: makeId('doc'),
-    name: 'Dr. New Doctor',
-    specialty: 'General Physician',
-    bio: 'Add a short doctor profile for patients.',
-    fee: 500,
-    isAvailable: true,
-    slots: [
-      {
-        _id: makeId('slot'),
-        label: 'Morning OP',
-        startTime: '09:00',
-        endTime: '11:00',
-        tokenLimit: 20,
-        bookedTokens: 0,
-        fee: 500,
-        isActive: true,
-        date: ''
-      }
-    ]
+    slots: [],
+    ...doctorInput
   });
+
+export const removeLocalDoctor = (doctorId) => {
+  const nextDoctors = getLocalDoctors().filter((doctor) => doctor._id !== doctorId);
+  saveLocalDoctors(nextDoctors);
+  return nextDoctors;
+};
 
 export const saveLocalSlot = (doctorId, slotInput) => {
   const doctors = getLocalDoctors();
@@ -144,19 +141,56 @@ export const saveLocalSlot = (doctorId, slotInput) => {
   return nextDoctors.find((doctor) => doctor._id === doctorId);
 };
 
-export const addLocalSlot = (doctorId, date = '') => {
-  const doctor = getLocalDoctors().find((item) => item._id === doctorId);
-  return saveLocalSlot(doctorId, {
+export const createLocalSlot = (doctorId, slotInput) =>
+  saveLocalSlot(doctorId, {
     _id: makeId('slot'),
-    label: date ? 'Special OP' : 'New OP',
-    startTime: '09:00',
-    endTime: '10:00',
-    tokenLimit: 10,
+    ...slotInput,
     bookedTokens: 0,
-    fee: doctor?.fee || 500,
-    isActive: true,
-    date
   });
+
+const normalizeBookingDate = (date) => {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+};
+
+const endOfDay = (date) => {
+  const value = normalizeBookingDate(date);
+  value.setHours(23, 59, 59, 999);
+  return value;
+};
+
+const slotDateTime = (date, time = '00:00') => {
+  const value = normalizeBookingDate(date);
+  const [hours = 0, minutes = 0] = String(time).split(':').map(Number);
+  value.setHours(hours, minutes, 0, 0);
+  return value;
+};
+
+export const getSlotBookingPolicy = (slot, date, now = new Date()) => {
+  const day = normalizeBookingDate(date);
+  const today = normalizeBookingDate(now);
+  const availableFrom = slot?.availableFrom ? normalizeBookingDate(slot.availableFrom) : null;
+  const availableUntil = slot?.availableUntil ? endOfDay(slot.availableUntil) : null;
+  const advanceBookingMinutes = Math.max(Number(slot?.advanceBookingMinutes ?? 60), 0);
+  const latestSameDayBookingAt = new Date(slotDateTime(day, slot?.startTime).getTime() - advanceBookingMinutes * 60 * 1000);
+  const reasons = [];
+
+  if (day < today) reasons.push('Booking date cannot be in the past');
+  if (availableFrom && day < availableFrom) reasons.push('This slot is not available yet');
+  if (availableUntil && day > availableUntil) reasons.push('This slot is not available for this future date');
+  if (day.getTime() === today.getTime() && now > latestSameDayBookingAt) {
+    reasons.push(`Book at least ${advanceBookingMinutes} minutes before this slot starts`);
+  }
+
+  return {
+    isBookable: reasons.length === 0,
+    reasons,
+    availableFrom,
+    availableUntil,
+    advanceBookingMinutes,
+    latestSameDayBookingAt
+  };
 };
 
 export const createVerifiedLocalBooking = ({ doctor, slot, date, patient, user, payment }) => {
@@ -173,6 +207,8 @@ export const createVerifiedLocalBooking = ({ doctor, slot, date, patient, user, 
   const liveDoctor = doctors[doctorIndex];
   const liveSlot = liveDoctor?.slots[slotIndex];
   if (!liveDoctor || !liveSlot) throw new Error('Slot not found');
+  const policy = getSlotBookingPolicy(liveSlot, date);
+  if (!policy.isBookable) throw new Error(policy.reasons[0]);
 
   const bookedTokens = liveSlot.bookedTokens || 0;
   const remaining = Math.max(liveSlot.tokenLimit - bookedTokens, 0);
@@ -305,21 +341,46 @@ export const updateLocalRefundStatus = (id, status, adminNote = '') => {
   return refunds.find((item) => item._id === id);
 };
 
+export const getLocalMedicalRecords = () => JSON.parse(localStorage.getItem(MEDICAL_RECORDS_KEY) || '[]');
+
+export const getLocalMedicalRecordsForUser = (email) =>
+  getLocalMedicalRecords().filter((item) => normalizeEmail(item.email) === normalizeEmail(email));
+
+export const saveLocalMedicalRecord = ({ email, type, title, sourceText, aiSummary }) => {
+  const records = getLocalMedicalRecords();
+  const entry = {
+    _id: `REC-${Date.now()}`,
+    email: normalizeEmail(email),
+    type: type || 'report',
+    title: title || 'AI medical summary',
+    sourceText,
+    aiSummary,
+    createdAt: new Date().toISOString()
+  };
+  localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify([entry, ...records]));
+  window.dispatchEvent(new Event('jk-local-sync'));
+  return entry;
+};
+
 export const getSlotAvailability = (doctor, slotId, date) => {
   const slot = doctor?.slots?.find((item) => item._id === slotId);
   if (!slot || slot.isActive === false || !doctor?.isAvailable) {
-    return { slot, booked: 0, remaining: 0, isFull: true, fee: doctor?.fee || 500 };
+    return { slot, booked: 0, remaining: 0, isFull: true, isBookable: false, fee: doctor?.fee || 500, reasons: ['Slot is unavailable'] };
   }
   if (slot.date && slot.date !== date) {
-    return { slot, booked: 0, remaining: 0, isFull: true, fee: slot.fee ?? doctor.fee };
+    return { slot, booked: 0, remaining: 0, isFull: true, isBookable: false, fee: slot.fee ?? doctor.fee, reasons: ['Slot is not active on this date'] };
   }
+  const policy = getSlotBookingPolicy(slot, date);
   const booked = slot.bookedTokens || 0;
   const remaining = Math.max((slot.tokenLimit || 0) - booked, 0);
   return {
     slot,
     booked,
     remaining,
-    isFull: remaining <= 0,
+    isFull: remaining <= 0 || !policy.isBookable,
+    isBookable: policy.isBookable,
+    reasons: policy.reasons,
+    bookingPolicy: policy,
     fee: normalizeFee(slot.fee, doctor.fee),
     estimatedWaitMinutes: Math.max(booked, 0) * 8
   };

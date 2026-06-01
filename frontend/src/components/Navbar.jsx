@@ -1,19 +1,22 @@
-import { Activity, CalendarCheck, LayoutDashboard, LogOut, Mail, Menu, ShieldCheck, Stethoscope, UsersRound, X } from 'lucide-react';
+import { UserButton } from '@clerk/clerk-react';
+import { Activity, Bot, CalendarCheck, LayoutDashboard, LogOut, Mail, Menu, ShieldCheck, Stethoscope, UsersRound, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import BrandLogo from './BrandLogo.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const linkClass = ({ isActive }) =>
-    `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive ? 'bg-medical-50 text-medical-600 shadow-[inset_0_0_0_1px_rgba(20,123,209,0.12)]' : 'text-slate-600 hover:bg-slate-50 hover:text-medical-600'}`;
+    `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive ? 'bg-white/60 text-medical-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_24px_rgba(13,99,173,0.1)] ring-1 ring-medical-200/70 backdrop-blur-xl' : 'text-slate-600 hover:bg-white/50 hover:text-medical-700 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] hover:backdrop-blur-xl'}`;
 
   const links = user
     ? [
         ['/dashboard', LayoutDashboard, 'Patient'],
         ['/book', CalendarCheck, 'Book'],
+        ['/ai', Bot, 'AI'],
         ['/doctors', UsersRound, 'Doctors'],
         ['/contact', Mail, 'Contact'],
         ['/services', Stethoscope, 'Services'],
@@ -21,6 +24,7 @@ export default function Navbar() {
       ]
     : [
         ['/', Activity, 'Home'],
+        ['/ai', Bot, 'AI'],
         ['/doctors', UsersRound, 'Doctors'],
         ['/services', Stethoscope, 'Services'],
         ['/contact', Mail, 'Contact']
@@ -34,14 +38,16 @@ export default function Navbar() {
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       style={{ transformPerspective: 1200 }}
     >
-      <div className="container-pad flex h-16 items-center justify-between">
-        <Link to="/" className="magnetic-btn flex items-center gap-3 font-bold text-ink">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-medical-600 to-emerald-500 text-white shadow-[0_10px_24px_rgba(13,99,173,0.24)]">
-            <Activity size={22} />
+      <div className="container-pad flex h-16 items-center justify-between gap-3">
+        <Link to="/" className="magnetic-btn min-w-0 shrink-0 text-ink" aria-label="JK Hospital home">
+          <span className="hidden min-[380px]:inline-flex">
+            <BrandLogo className="navbar-brand" />
           </span>
-          <span>JK Hospital</span>
+          <span className="inline-flex min-[380px]:hidden">
+            <BrandLogo compact markSize="sm" />
+          </span>
         </Link>
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden min-w-0 items-center gap-1 md:flex">
           {links.map(([to, Icon, label]) => (
             <NavLink key={to} to={to} className={linkClass}>
               <Icon className="mr-2 inline" size={16} />
@@ -49,21 +55,31 @@ export default function Navbar() {
             </NavLink>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <button type="button" className="rounded-lg border border-slate-200 p-2 md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Menu">
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" className="rounded-lg border border-white/70 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Menu">
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
           {user ? (
-            <button onClick={logout} className="btn-secondary hidden px-3 py-2 sm:inline-flex">
-              <LogOut size={16} />
-              Logout
-            </button>
+            <>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: 'h-10 w-10 rounded-xl shadow-[0_10px_24px_rgba(13,99,173,0.18)]',
+                    userButtonPopoverCard: 'rounded-2xl border border-slate-200 shadow-[0_24px_80px_rgba(8,47,73,0.16)]'
+                  }
+                }}
+              />
+              <button onClick={logout} className="btn-secondary hidden px-3 py-2 sm:inline-flex">
+                <LogOut size={16} />
+                Logout
+              </button>
+            </>
           ) : (
             <>
-              <Link to="/login" className="btn-secondary hidden px-4 py-2 sm:inline-flex">
+              <Link to="/login" className="nav-auth-link btn-secondary hidden px-4 py-2 min-[520px]:inline-flex">
                 Login
               </Link>
-              <Link to="/signup" className="btn-primary hidden px-4 py-2 sm:inline-flex">
+              <Link to="/signup" className="nav-auth-link btn-primary hidden whitespace-nowrap px-4 py-2 min-[520px]:inline-flex">
                 Sign up
               </Link>
             </>

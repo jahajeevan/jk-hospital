@@ -20,13 +20,24 @@ export async function downloadInvoice(appointment) {
   doc.rect(pageW - 55, 0, 55, 42, 'F');
 
   doc.setTextColor(255, 255, 255);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(14, 10, 18, 18, 4, 4, 'F');
+  doc.setDrawColor(...brand);
+  doc.setLineWidth(1.1);
+  doc.line(18, 19, 21.5, 19);
+  doc.line(21.5, 19, 24, 14);
+  doc.line(24, 14, 28, 24);
+  doc.line(28, 24, 30.5, 19);
+  doc.line(30.5, 19, 34, 19);
+
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont(undefined, 'bold');
-  doc.text('JK Hospital', 16, 18);
+  doc.text('JK Hospital', 38, 18);
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  doc.text('Modern OP tokens · Verified online payments', 16, 26);
-  doc.text('Emergency: 7845265507', 16, 33);
+  doc.text('Modern OP tokens · Verified online payments', 38, 26);
+  doc.text('Emergency: 7845265507', 38, 33);
 
   doc.setFontSize(9);
   doc.text('OFFICIAL RECEIPT', pageW - 16, 16, { align: 'right' });

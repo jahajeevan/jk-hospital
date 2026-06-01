@@ -1,9 +1,7 @@
 import crypto from 'node:crypto';
-import Appointment from '../models/Appointment.js';
-import Doctor from '../models/Doctor.js';
-import Payment from '../models/Payment.js';
+import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
 import { createConfirmedAppointment } from './appointmentController.js';
-import { normalizeAppointmentDate } from '../services/tokenService.js';
+import { assertSlotBookable, normalizeAppointmentDate } from '../services/tokenService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { formatGatewayError } from '../utils/paymentGatewayHealth.js';
 import { getRazorpayCredentials, razorpayRequest } from '../utils/razorpayClient.js';
@@ -60,10 +58,21 @@ const requirePatientDetails = (patientDetails = {}) => {
     error.statusCode = 400;
     throw error;
   }
+  if (!/^[6-9]\d{9}$/.test(String(patientDetails.phone))) {
+    const error = new Error('A valid 10-digit Indian mobile number is required for payment contact');
+    error.statusCode = 400;
+    throw error;
+  }
+  const age = Number(patientDetails.age);
+  if (!Number.isFinite(age) || age < 1 || age > 120) {
+    const error = new Error('A valid patient age from 1 to 120 is required');
+    error.statusCode = 400;
+    throw error;
+  }
 };
 
 const getSlotFee = (doctor, slotId) => {
-  const slot = doctor.slots.id(slotId);
+  const slot = doctor.slots?.find((s) => String(s._id || s.id) === String(slotId));
   if (!slot) {
     const error = new Error('Selected slot not found');
     error.statusCode = 404;
@@ -96,6 +105,7 @@ export const createRazorpayOrder = asyncHandler(async (req, res) => {
           appointmentDate: String(appointmentDate || ''),
           patientName: String(patientDetails.name || ''),
           patientEmail: String(patientDetails.email || ''),
+          patientPhone: String(patientDetails.phone || ''),
           preferredPaymentMode: String(preferredPaymentMode)
         }
       }
@@ -166,20 +176,32 @@ export const createCheckoutSession = asyncHandler(async (req, res) => {
   const { doctorId, slotId, appointmentDate, patientDetails, preferredPaymentMode = 'upi' } = req.body;
   requirePatientDetails(patientDetails);
 
-  const doctor = await Doctor.findById(doctorId);
+  const { data: doctors } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .eq('id', doctorId)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const doctor = toCamelObj(doctors?.[0]);
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;
     throw error;
   }
 
-  const existing = await Appointment.findOne({
-    patient: req.user._id,
-    doctor: doctor._id,
-    appointmentDate: normalizeAppointmentDate(appointmentDate),
-    slotId,
-    status: { $nin: ['cancelled', 'rejected'] }
-  });
+  const { data: duplicates } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('patient_id', req.user._id)
+    .eq('doctor_id', doctor._id)
+    .eq('appointment_date', normalizeAppointmentDate(appointmentDate).toISOString().slice(0, 10))
+    .eq('slot_id', slotId)
+    .not('status', 'in', '("cancelled","rejected")')
+    .is('deleted_at', null)
+    .limit(1);
+
+  const existing = toCamelObj(duplicates?.[0]);
   if (existing) {
     const error = new Error('Duplicate booking for this doctor, date, and slot is not allowed');
     error.statusCode = 409;
@@ -187,33 +209,36 @@ export const createCheckoutSession = asyncHandler(async (req, res) => {
   }
 
   const amount = getSlotFee(doctor, slotId);
+  const targetSlot = doctor.slots?.find(s => String(s._id || s.id) === String(slotId));
+  assertSlotBookable(targetSlot, appointmentDate);
+
   const session = await runStripe(() =>
     getStripe().checkout.sessions.create({
-    mode: 'payment',
-    client_reference_id: String(req.user._id),
-    customer_email: req.user.email,
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: 'inr',
-          unit_amount: Math.round(amount * 100),
-          product_data: {
-            name: `JK Hospital appointment with ${doctor.name}`,
-            description: `${appointmentDate} - ${patientDetails.name}`
+      mode: 'payment',
+      client_reference_id: String(req.user._id),
+      customer_email: req.user.email,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'inr',
+            unit_amount: Math.round(amount * 100),
+            product_data: {
+              name: `JK Hospital appointment with ${doctor.name}`,
+              description: `${appointmentDate} - ${patientDetails.name}`
+            }
           }
         }
-      }
-    ],
-    metadata: {
-      userId: String(req.user._id),
-      doctorId: String(doctor._id),
-      slotId: String(slotId),
-      appointmentDate: String(appointmentDate),
-      preferredPaymentMode: String(preferredPaymentMode)
-    },
-    success_url: `${clientUrl()}/payment?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${clientUrl()}/payment?cancelled=true`
+      ],
+      metadata: {
+        userId: String(req.user._id),
+        doctorId: String(doctor._id),
+        slotId: String(slotId),
+        appointmentDate: String(appointmentDate),
+        preferredPaymentMode: String(preferredPaymentMode)
+      },
+      success_url: `${clientUrl()}/payment?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${clientUrl()}/payment?cancelled=true`
     })
   );
 
@@ -303,9 +328,21 @@ export const confirmCheckoutSession = asyncHandler(async (req, res) => {
   const { sessionId, patientDetails } = req.body;
   requirePatientDetails(patientDetails);
 
-  const existingPayment = await Payment.findOne({ stripeSessionId: sessionId });
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('stripe_session_id', sessionId)
+    .limit(1);
+
+  const existingPayment = toCamelObj(payments?.[0]);
   if (existingPayment?.appointment) {
-    const appointment = await Appointment.findById(existingPayment.appointment).populate('doctor').populate('payment');
+    const { data: populatedData } = await supabase
+      .from('appointments')
+      .select('*, doctor:doctors(*), payment:payments(*)')
+      .eq('id', existingPayment.appointment)
+      .limit(1);
+
+    const appointment = toCamelObj(populatedData?.[0]);
     return res.json({ appointment, invoiceReady: true });
   }
 

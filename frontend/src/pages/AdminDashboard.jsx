@@ -1,17 +1,19 @@
 import { motion } from 'framer-motion';
-import { CalendarPlus, Eye, Image, LockKeyhole, MailCheck, Plus, ShieldCheck, Stethoscope, X } from 'lucide-react';
+import { CalendarPlus, Eye, Image, LockKeyhole, MailCheck, Plus, ShieldCheck, Stethoscope, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import api from '../api/client.js';
 import MetricCard from '../components/MetricCard.jsx';
+import Modal from '../components/ui/Modal.jsx';
 import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
 import {
-  addLocalDoctor,
-  addLocalSlot,
+  createLocalDoctor,
+  createLocalSlot,
   getLocalBookings,
   getLocalDoctors,
   getLocalRefunds,
+  removeLocalDoctor,
   saveLocalDoctor,
   saveLocalSlot,
   updateLocalBookingStatus,
@@ -19,9 +21,24 @@ import {
 } from '../utils/localStore.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { MIN_CONSULTATION_FEE, normalizeFee } from '../utils/paymentRules.js';
+import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl } from '../utils/validation.js';
 
 const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const palette = ['#147bd1', '#10b981', '#f59e0b', '#e05283'];
+const defaultDoctorForm = { name: '', specialty: '', avatar: '', fee: 500, bio: '', isAvailable: true };
+const defaultSlotForm = {
+  doctorId: '',
+  label: '',
+  date: '',
+  availableFrom: '',
+  availableUntil: '',
+  startTime: '',
+  endTime: '',
+  tokenLimit: '',
+  fee: 500,
+  advanceBookingMinutes: 60,
+  isActive: true
+};
 
 export default function AdminDashboard() {
   const [unlocked, setUnlocked] = useState(() => isAdminSessionOpen());
@@ -33,6 +50,10 @@ export default function AdminDashboard() {
   const [adminTab, setAdminTab] = useState('overview');
   const [bookingQuery, setBookingQuery] = useState('');
   const [refunds, setRefunds] = useState([]);
+  const [doctorFormOpen, setDoctorFormOpen] = useState(false);
+  const [doctorForm, setDoctorForm] = useState(defaultDoctorForm);
+  const [slotFormOpen, setSlotFormOpen] = useState(false);
+  const [slotForm, setSlotForm] = useState(defaultSlotForm);
 
   useEffect(() => {
     const loadLocal = () => {
@@ -153,7 +174,7 @@ export default function AdminDashboard() {
     const doctor = doctorList.find((item) => item._id === doctorId);
     const current = doctor?.slots.find((slot) => slot._id === slotId);
     if (!doctor || !current) return;
-    const numericFields = ['fee', 'tokenLimit', 'bookedTokens'];
+    const numericFields = ['fee', 'tokenLimit', 'bookedTokens', 'advanceBookingMinutes'];
     const nextValue = numericFields.includes(field) ? Math.max(Number(value), 0) : value;
     const nextSlot = {
       ...current,
@@ -162,8 +183,13 @@ export default function AdminDashboard() {
     if (field === 'tokenLimit') {
       nextSlot.bookedTokens = Math.min(nextSlot.bookedTokens || 0, nextSlot.tokenLimit);
     }
-    saveLocalSlot(doctorId, nextSlot);
+    const nextDoctor = saveLocalSlot(doctorId, nextSlot);
     setDoctorList(getLocalDoctors());
+    try {
+      await api.put(`/admin/doctors/${doctorId}`, nextDoctor);
+    } catch {
+      // Local admin mode still works when the backend is unavailable or the admin is not signed in with an API token.
+    }
   };
 
   const updateRemaining = (doctorId, slotId, value) => {
@@ -174,16 +200,104 @@ export default function AdminDashboard() {
     updateSlot(doctorId, slotId, 'bookedTokens', Math.max((slot.tokenLimit || 0) - remaining, 0));
   };
 
-  const createDoctor = () => {
-    const doctor = addLocalDoctor();
+  const openDoctorForm = () => {
+    setDoctorForm(defaultDoctorForm);
+    setDoctorFormOpen(true);
+  };
+
+  const validateDoctorForm = () => {
+    if (!doctorForm.name.trim()) return 'Doctor name is required';
+    if (!doctorForm.specialty.trim()) return 'Specialty is required';
+    if (!isValidHttpUrl(doctorForm.avatar)) return 'Enter a valid doctor image URL';
+    if (normalizeFee(doctorForm.fee) < MIN_CONSULTATION_FEE) return `Fee must be at least INR ${MIN_CONSULTATION_FEE}`;
+    if (doctorForm.bio.trim().length < 12) return 'Profile must be at least 12 characters';
+    return '';
+  };
+
+  const createDoctor = async (event) => {
+    event.preventDefault();
+    const error = validateDoctorForm();
+    if (error) return toast.error(error);
+    const doctor = createLocalDoctor({
+      ...doctorForm,
+      name: doctorForm.name.trim(),
+      specialty: doctorForm.specialty.trim(),
+      avatar: doctorForm.avatar.trim(),
+      bio: doctorForm.bio.trim(),
+      fee: normalizeFee(doctorForm.fee)
+    });
     setDoctorList(getLocalDoctors());
+    setDoctorFormOpen(false);
+    setDoctorForm(defaultDoctorForm);
+    try {
+      await api.put(`/admin/doctors/${doctor._id}`, doctor);
+    } catch {
+      // Local admin mode still works when the backend is unavailable.
+    }
     toast.success(`${doctor.name} added`);
   };
 
-  const createSlot = (doctorId, date = '') => {
-    addLocalSlot(doctorId, date);
+  const openSlotForm = (doctorId, date = '') => {
+    const doctor = doctorList.find((item) => item._id === doctorId);
+    setSlotForm({
+      ...defaultSlotForm,
+      doctorId,
+      date,
+      fee: doctor?.fee || 500
+    });
+    setSlotFormOpen(true);
+  };
+
+  const validateSlotForm = () => {
+    if (!slotForm.doctorId) return 'Select a doctor before adding a slot';
+    if (!slotForm.label.trim()) return 'Slot name is required';
+    if (!slotForm.startTime || !slotForm.endTime) return 'Start and end time are required';
+    if (!isTimeBefore(slotForm.startTime, slotForm.endTime)) return 'Slot end time must be after start time';
+    if (!isPositiveInteger(slotForm.tokenLimit)) return 'Total slots must be a positive number';
+    if (normalizeFee(slotForm.fee) < MIN_CONSULTATION_FEE) return `Slot fee must be at least INR ${MIN_CONSULTATION_FEE}`;
+    if (!isNonNegativeInteger(slotForm.advanceBookingMinutes)) return 'Book-before minutes must be zero or more';
+    if (slotForm.availableFrom && slotForm.availableUntil && slotForm.availableFrom > slotForm.availableUntil) {
+      return 'Available until cannot be before available from';
+    }
+    return '';
+  };
+
+  const createSlot = async (event) => {
+    event.preventDefault();
+    const error = validateSlotForm();
+    if (error) return toast.error(error);
+    const nextDoctor = createLocalSlot(slotForm.doctorId, {
+      label: slotForm.label.trim(),
+      date: slotForm.date,
+      availableFrom: slotForm.availableFrom,
+      availableUntil: slotForm.availableUntil,
+      startTime: slotForm.startTime,
+      endTime: slotForm.endTime,
+      tokenLimit: Number(slotForm.tokenLimit),
+      fee: normalizeFee(slotForm.fee),
+      advanceBookingMinutes: Number(slotForm.advanceBookingMinutes),
+      isActive: slotForm.isActive
+    });
     setDoctorList(getLocalDoctors());
-    toast.success(date ? 'Date-specific slot added' : 'Slot added');
+    setSlotFormOpen(false);
+    setSlotForm(defaultSlotForm);
+    try {
+      await api.put(`/admin/doctors/${nextDoctor._id}`, nextDoctor);
+    } catch {
+      // Local admin mode still works when the backend is unavailable.
+    }
+    toast.success('Slot added');
+  };
+
+  const deleteDoctor = (doctor) => {
+    const hasBookings = bookings.some((booking) => booking.doctor?._id === doctor._id);
+    if (hasBookings) {
+      toast.error('This doctor has bookings. Mark unavailable instead of deleting.');
+      return;
+    }
+    removeLocalDoctor(doctor._id);
+    setDoctorList(getLocalDoctors());
+    toast.success(`${doctor.name} removed`);
   };
 
   const decide = async (booking, status) => {
@@ -317,7 +431,7 @@ export default function AdminDashboard() {
               <p className="text-sm font-semibold text-medical-600">Live schedule studio</p>
               <h2 className="text-xl font-bold">Doctor and slot management</h2>
             </div>
-            <button onClick={createDoctor} className="btn-primary px-4 py-2"><Plus size={16} /> Add doctor</button>
+            <button type="button" onClick={openDoctorForm} className="btn-primary px-4 py-2"><Plus size={16} /> Add doctor</button>
           </div>
           <div className="mt-4 space-y-5">
             {doctorList.map((doctor) => (
@@ -361,9 +475,10 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <button onClick={() => createSlot(doctor._id)} className="btn-secondary px-3 py-2"><Plus size={15} /> Add regular slot</button>
-                  <button onClick={() => createSlot(doctor._id, new Date().toISOString().slice(0, 10))} className="btn-secondary px-3 py-2"><CalendarPlus size={15} /> Add today-only slot</button>
+                  <button type="button" onClick={() => openSlotForm(doctor._id)} className="btn-secondary px-3 py-2"><Plus size={15} /> Add regular slot</button>
+                  <button type="button" onClick={() => openSlotForm(doctor._id, new Date().toISOString().slice(0, 10))} className="btn-secondary px-3 py-2"><CalendarPlus size={15} /> Add today-only slot</button>
                   <button onClick={() => markLeave(doctor)} className="btn-secondary px-3 py-2">Leave mode</button>
+                  <button type="button" onClick={() => deleteDoctor(doctor)} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"><Trash2 size={15} className="mr-1 inline" /> Delete doctor</button>
                 </div>
 
                 <div className="mt-4 grid gap-3">
@@ -373,7 +488,7 @@ export default function AdminDashboard() {
                     const remaining = Math.max(total - booked, 0);
                     return (
                       <div key={slot._id} className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm">
-                        <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                           <label className="text-xs font-bold text-slate-500">
                             Slot name
                             <input className="field mt-1 px-2 py-1.5" value={slot.label} onChange={(event) => updateSlot(doctor._id, slot._id, 'label', event.target.value)} />
@@ -382,8 +497,16 @@ export default function AdminDashboard() {
                             Specific date
                             <input className="field mt-1 px-2 py-1.5" type="date" value={slot.date || ''} onChange={(event) => updateSlot(doctor._id, slot._id, 'date', event.target.value)} />
                           </label>
+                          <label className="text-xs font-bold text-slate-500">
+                            Available from
+                            <input className="field mt-1 px-2 py-1.5" type="date" value={slot.availableFrom || ''} onChange={(event) => updateSlot(doctor._id, slot._id, 'availableFrom', event.target.value)} />
+                          </label>
+                          <label className="text-xs font-bold text-slate-500">
+                            Available until
+                            <input className="field mt-1 px-2 py-1.5" type="date" value={slot.availableUntil || ''} onChange={(event) => updateSlot(doctor._id, slot._id, 'availableUntil', event.target.value)} />
+                          </label>
                         </div>
-                        <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                        <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
                         <label className="text-xs font-bold text-slate-500">
                           Start
                           <input className="field mt-1 px-2 py-1.5" type="time" value={slot.startTime} onChange={(event) => updateSlot(doctor._id, slot._id, 'startTime', event.target.value)} />
@@ -408,9 +531,15 @@ export default function AdminDashboard() {
                           Fee
                           <input className="field mt-1 px-2 py-1.5" type="number" min={MIN_CONSULTATION_FEE} value={slot.fee ?? doctor.fee} onChange={(event) => updateSlot(doctor._id, slot._id, 'fee', event.target.value)} />
                         </label>
+                        <label className="text-xs font-bold text-slate-500">
+                          Book before
+                          <input className="field mt-1 px-2 py-1.5" type="number" min="0" value={slot.advanceBookingMinutes ?? 60} onChange={(event) => updateSlot(doctor._id, slot._id, 'advanceBookingMinutes', event.target.value)} />
+                        </label>
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3">
-                          <p className="text-xs text-slate-500">{slot.date ? `Only visible on ${slot.date}` : 'Regular slot visible on every date'}</p>
+                          <p className="text-xs text-slate-500">
+                            {slot.date ? `Only visible on ${slot.date}` : 'Regular slot'} · future booking {slot.availableUntil ? `until ${slot.availableUntil}` : 'has no end date'} · same-day cutoff {slot.advanceBookingMinutes ?? 60} min
+                          </p>
                           <button
                             type="button"
                             onClick={() => updateSlot(doctor._id, slot._id, 'isActive', !slot.isActive)}
@@ -517,6 +646,108 @@ export default function AdminDashboard() {
           </div>
         </section>
       )}
+      <Modal
+        open={doctorFormOpen}
+        title="Add doctor"
+        onClose={() => setDoctorFormOpen(false)}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setDoctorFormOpen(false)} className="btn-secondary px-4 py-2">Cancel</button>
+            <button type="submit" form="doctor-create-form" className="btn-primary px-4 py-2">Save doctor</button>
+          </div>
+        }
+      >
+        <form id="doctor-create-form" onSubmit={createDoctor} className="grid gap-3">
+          <label className="text-xs font-bold text-slate-500">
+            Doctor name
+            <input className="field mt-1" required value={doctorForm.name} onChange={(event) => setDoctorForm((value) => ({ ...value, name: event.target.value }))} />
+          </label>
+          <label className="text-xs font-bold text-slate-500">
+            Specialty
+            <input className="field mt-1" required value={doctorForm.specialty} onChange={(event) => setDoctorForm((value) => ({ ...value, specialty: event.target.value }))} />
+          </label>
+          <label className="text-xs font-bold text-slate-500">
+            Image URL
+            <input className="field mt-1" required type="url" value={doctorForm.avatar} onChange={(event) => setDoctorForm((value) => ({ ...value, avatar: event.target.value }))} />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-bold text-slate-500">
+              Base consultation fee
+              <input className="field mt-1" required type="number" min={MIN_CONSULTATION_FEE} value={doctorForm.fee} onChange={(event) => setDoctorForm((value) => ({ ...value, fee: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Availability
+              <select className="field mt-1" value={doctorForm.isAvailable ? 'yes' : 'no'} onChange={(event) => setDoctorForm((value) => ({ ...value, isAvailable: event.target.value === 'yes' }))}>
+                <option value="yes">Available</option>
+                <option value="no">On leave</option>
+              </select>
+            </label>
+          </div>
+          <label className="text-xs font-bold text-slate-500">
+            Profile
+            <textarea className="field mt-1 min-h-24" required value={doctorForm.bio} onChange={(event) => setDoctorForm((value) => ({ ...value, bio: event.target.value }))} />
+          </label>
+          <p className="rounded-lg bg-medical-50 p-3 text-xs text-medical-800">
+            Slots are added separately after the doctor is saved, so the system never creates random OP timings.
+          </p>
+        </form>
+      </Modal>
+      <Modal
+        open={slotFormOpen}
+        title="Add slot"
+        onClose={() => setSlotFormOpen(false)}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setSlotFormOpen(false)} className="btn-secondary px-4 py-2">Cancel</button>
+            <button type="submit" form="slot-create-form" className="btn-primary px-4 py-2">Save slot</button>
+          </div>
+        }
+      >
+        <form id="slot-create-form" onSubmit={createSlot} className="grid gap-3">
+          <label className="text-xs font-bold text-slate-500">
+            Slot name
+            <input className="field mt-1" required value={slotForm.label} onChange={(event) => setSlotForm((value) => ({ ...value, label: event.target.value }))} />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-bold text-slate-500">
+              Start time
+              <input className="field mt-1" required type="time" value={slotForm.startTime} onChange={(event) => setSlotForm((value) => ({ ...value, startTime: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              End time
+              <input className="field mt-1" required type="time" value={slotForm.endTime} onChange={(event) => setSlotForm((value) => ({ ...value, endTime: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Total tokens
+              <input className="field mt-1" required type="number" min="1" value={slotForm.tokenLimit} onChange={(event) => setSlotForm((value) => ({ ...value, tokenLimit: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Slot fee
+              <input className="field mt-1" required type="number" min={MIN_CONSULTATION_FEE} value={slotForm.fee} onChange={(event) => setSlotForm((value) => ({ ...value, fee: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Specific date
+              <input className="field mt-1" type="date" value={slotForm.date} onChange={(event) => setSlotForm((value) => ({ ...value, date: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Book before minutes
+              <input className="field mt-1" required type="number" min="0" value={slotForm.advanceBookingMinutes} onChange={(event) => setSlotForm((value) => ({ ...value, advanceBookingMinutes: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Available from
+              <input className="field mt-1" type="date" value={slotForm.availableFrom} onChange={(event) => setSlotForm((value) => ({ ...value, availableFrom: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Available until
+              <input className="field mt-1" type="date" value={slotForm.availableUntil} onChange={(event) => setSlotForm((value) => ({ ...value, availableUntil: event.target.value }))} />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+            <input type="checkbox" checked={slotForm.isActive} onChange={(event) => setSlotForm((value) => ({ ...value, isActive: event.target.checked }))} />
+            Visible for booking
+          </label>
+        </form>
+      </Modal>
       {selectedProof && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
           <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-soft dark:bg-slate-900">

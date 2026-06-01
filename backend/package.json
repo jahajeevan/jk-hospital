@@ -6,10 +6,16 @@
   "scripts": {
     "dev": "NODE_OPTIONS=--dns-result-order=ipv4first nodemon src/server.js",
     "start": "NODE_OPTIONS=--dns-result-order=ipv4first node src/server.js",
-    "seed": "node src/seed/seed.js"
+    "seed": "node src/seed/seed.js",
+    "test": "node --test"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.21",
+    "@supabase/supabase-js": "^2.43.0",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.76.10",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -17,15 +23,22 @@
     "express-validator": "^7.2.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "nodemailer": "^8.0.7",
     "pdfkit": "^0.15.2",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "redis": "^5.12.1",
+    "socket.io": "^4.8.3",
     "stripe": "^22.1.1",
-    "uuid": "^11.0.5"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^11.0.5",
+    "xss-clean": "^0.1.4",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "supertest": "^7.2.2"
   }
 }

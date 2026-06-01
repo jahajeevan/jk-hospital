@@ -1,75 +1,113 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
+import { BrandMark } from '../components/BrandLogo.jsx';
 import { hydrateLocalStore } from '../utils/localStore.js';
-import {
-  authenticateUser,
-  clearUserSession,
-  createUserSession,
-  initUserStore,
-  readUserSession,
-  registerUser
-} from '../utils/userStore.js';
 
 const AuthContext = createContext(null);
+const BROWSER_SESSION_KEY = 'jk_browser_session_alive';
+const AI_MESSAGES_KEY = 'jk_ai_messages';
+const AI_SESSION_KEY = 'jk_ai_session_id';
+const PAYMENT_KEYS = ['jk_pending_payment_booking', 'jk_pending_payment_mode', 'jk_pending_payment_provider'];
+const adminEmails = new Set(
+  String(import.meta.env.VITE_CLERK_ADMIN_EMAILS || 'admin@jkhospital.local')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const { isLoaded, isSignedIn, getToken } = useClerkAuth();
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
   const [booting, setBooting] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const freshBrowserSession = useRef(sessionStorage.getItem(BROWSER_SESSION_KEY) !== 'active');
+  const previousUserId = useRef(null);
 
   useEffect(() => {
     const boot = async () => {
-      await Promise.all([initUserStore(), hydrateLocalStore()]);
-      const session = readUserSession();
-      setUser(session?.user || null);
+      await hydrateLocalStore();
       setBooting(false);
     };
     void boot();
   }, []);
 
-  const login = async (credentials) => {
-    setLoading(true);
-    try {
-      const record = await authenticateUser(credentials.email, credentials.password);
-      const payload = await createUserSession(record);
-      setUser(payload.user);
-      toast.success('Welcome back to JK Hospital');
-      return payload;
-    } finally {
-      setLoading(false);
-    }
+  const email = clerkUser?.primaryEmailAddress?.emailAddress || clerkUser?.emailAddresses?.[0]?.emailAddress || '';
+  const role = clerkUser?.publicMetadata?.role || (adminEmails.has(email.toLowerCase()) ? 'admin' : 'patient');
+  const hospitalProfile = clerkUser?.unsafeMetadata?.hospitalProfile || {};
+  const firstName = hospitalProfile.firstName || clerkUser?.firstName || '';
+  const lastName = hospitalProfile.lastName || clerkUser?.lastName || '';
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+  const phone = hospitalProfile.phone || clerkUser?.primaryPhoneNumber?.phoneNumber || clerkUser?.phoneNumbers?.[0]?.phoneNumber || '';
+  const needsProfileCompletion = Boolean(isSignedIn && clerkUser && (!fullName || !/^[6-9]\d{9}$/.test(String(phone))));
+  const user = isSignedIn && clerkUser
+    ? {
+        id: clerkUser.id,
+        name: fullName || clerkUser.fullName || email.split('@')[0],
+        email,
+        phone,
+        role,
+        needsProfileCompletion,
+        isVerified: Boolean(clerkUser.primaryEmailAddress?.verification?.status === 'verified' || clerkUser.emailAddresses?.length)
+      }
+    : null;
+
+  const logout = async () => {
+    sessionStorage.removeItem(AI_MESSAGES_KEY);
+    sessionStorage.removeItem(AI_SESSION_KEY);
+    PAYMENT_KEYS.forEach((key) => sessionStorage.removeItem(key));
+    sessionStorage.removeItem('jk_token');
+    sessionStorage.removeItem('jk_user');
+    localStorage.removeItem('jk_token');
+    localStorage.removeItem('jk_user');
+    await signOut();
+    toast.success('Logged out securely');
   };
 
-  const signup = async (payload) => {
-    setLoading(true);
-    try {
-      const record = await registerUser(payload);
-      const session = await createUserSession(record);
-      setUser(session.user);
-      toast.success('Account created securely on this device');
-      return session;
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!isLoaded) return;
 
-  const logout = () => {
-    clearUserSession();
-    setUser(null);
-    toast.success('Logged out');
-  };
+    if (freshBrowserSession.current && isSignedIn) {
+      freshBrowserSession.current = false;
+      sessionStorage.clear();
+      void signOut();
+      return;
+    }
+
+    if (!isSignedIn) freshBrowserSession.current = false;
+    sessionStorage.setItem(BROWSER_SESSION_KEY, 'active');
+  }, [isLoaded, isSignedIn, signOut]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const currentUserId = isSignedIn ? clerkUser?.id || null : null;
+    if (currentUserId && previousUserId.current !== currentUserId) {
+      sessionStorage.removeItem(AI_MESSAGES_KEY);
+      sessionStorage.removeItem(AI_SESSION_KEY);
+    }
+    previousUserId.current = currentUserId;
+  }, [isLoaded, isSignedIn, clerkUser?.id]);
+
+  useEffect(() => {
+    window.jkGetClerkToken = getToken;
+    return () => {
+      if (window.jkGetClerkToken === getToken) delete window.jkGetClerkToken;
+    };
+  }, [getToken]);
 
   const value = useMemo(
-    () => ({ user, loading: loading || booting, login, signup, logout, isAdmin: user?.role === 'admin' }),
-    [user, loading, booting]
+    () => ({ user, clerkUser, loading: !isLoaded || booting, logout, getToken, isAdmin: user?.role === 'admin', needsProfileCompletion }),
+    [user, clerkUser, isLoaded, booting, getToken, logout]
   );
 
-  if (booting) {
+  if (!isLoaded || booting) {
     return (
-      <div className="grid min-h-screen place-items-center bg-[#f4f8fb]">
+      <div className="grid min-h-screen place-items-center bg-[#f4f8fb] px-4">
         <div className="cinematic-loader">
-          <span />
-          <p>Securing your JK Hospital session</p>
+          <BrandMark size="lg" className="cinematic-loader-logo" />
+          <span className="cinematic-loader-ring" />
+          <p>Preparing your JK Hospital visit</p>
+          <small>Secure session check</small>
         </div>
       </div>
     );

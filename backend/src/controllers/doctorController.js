@@ -1,22 +1,31 @@
-import Doctor from '../models/Doctor.js';
+import { supabase, toCamelObj } from '../config/supabase.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getSlotAvailability } from '../services/tokenService.js';
 
 export const listDoctors = asyncHandler(async (_req, res) => {
-  if (Doctor.db.readyState !== 1) {
+  const { data: doctorsData, error } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
+
+  if (error) {
     return res.json({ doctors: [] });
   }
-  const doctors = await Doctor.find().sort({ createdAt: 1 });
+
+  const doctors = toCamelObj(doctorsData) || [];
   res.json({ doctors });
 });
 
 export const getDoctor = asyncHandler(async (req, res) => {
-  if (Doctor.db.readyState !== 1) {
-    const error = new Error('Doctor database is not configured');
-    error.statusCode = 503;
-    throw error;
-  }
-  const doctor = await Doctor.findById(req.params.id);
+  const { data: doctorData, error } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .eq('id', req.params.id)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const doctor = toCamelObj(doctorData?.[0]);
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;
@@ -26,12 +35,14 @@ export const getDoctor = asyncHandler(async (req, res) => {
 });
 
 export const doctorAvailability = asyncHandler(async (req, res) => {
-  if (Doctor.db.readyState !== 1) {
-    const error = new Error('Doctor database is not configured');
-    error.statusCode = 503;
-    throw error;
-  }
-  const doctor = await Doctor.findById(req.params.id);
+  const { data: doctorData } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .eq('id', req.params.id)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const doctor = toCamelObj(doctorData?.[0]);
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;
@@ -39,7 +50,7 @@ export const doctorAvailability = asyncHandler(async (req, res) => {
   }
 
   const slots = await Promise.all(
-    doctor.slots.map((slot) => getSlotAvailability(doctor, req.query.date || new Date(), slot._id))
+    (doctor.slots || []).map((slot) => getSlotAvailability(doctor, req.query.date || new Date(), slot._id))
   );
-  res.json({ doctorId: doctor._id, date: req.query.date, slots });
+  res.json({ doctorId: doctor._id, date: req.query.date || new Date().toISOString().slice(0, 10), slots });
 });

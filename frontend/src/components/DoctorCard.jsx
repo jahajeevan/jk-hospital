@@ -18,7 +18,7 @@ export default function DoctorCard({ doctor, index = 0, showSlots = true, compac
       transition={{ delay: index * 0.05 }}
       whileHover={{ y: -4 }}
     >
-      <motion.div className="relative h-52 overflow-hidden">
+      <motion.div className="doctor-card-media relative h-52 overflow-hidden">
         <img src={doctor.avatar} alt={doctor.name} className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent" />
         <span className={`absolute right-3 top-3 rounded-lg px-3 py-1 text-xs font-bold ${available ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
@@ -32,7 +32,7 @@ export default function DoctorCard({ doctor, index = 0, showSlots = true, compac
       <div className={compact ? 'p-4' : 'p-5'}>
         {!compact && <p className="line-clamp-2 text-sm text-slate-600">{doctor.bio}</p>}
         <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
-          <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5">
+          <span className="inline-flex items-center gap-1 rounded-lg bg-white/80 px-2.5 py-1.5 ring-1 ring-slate-200/70">
             <Stethoscope size={14} /> {doctor.slots.filter((s) => s.isActive !== false).length} slots
           </span>
           <span className="rounded-lg bg-medical-50 px-2.5 py-1.5 text-medical-700">Fee shown after slot selection</span>

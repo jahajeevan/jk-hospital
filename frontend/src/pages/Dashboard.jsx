@@ -1,8 +1,10 @@
-import { Bell, CalendarClock, Copy, Download, FileText, Plus, RefreshCcw, Stethoscope, XCircle } from 'lucide-react';
+import { Bell, Bot, CalendarClock, Copy, FileText, Loader2, Plus, RefreshCcw, Save, ShieldAlert, Sparkles, Stethoscope, XCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import api, { formatApiError } from '../api/client.js';
+import AiResponse from '../components/ai/AiResponse.jsx';
 import MetricCard from '../components/MetricCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -10,13 +12,16 @@ import { downloadInvoice } from '../utils/invoice.js';
 import {
   cancelLocalBooking,
   getLocalBookingsForUser,
+  getLocalMedicalRecordsForUser,
   getLocalRefundsForUser,
+  saveLocalMedicalRecord,
   saveLocalRefund
 } from '../utils/localStore.js';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'appointments', label: 'Appointments' },
+  { id: 'records', label: 'AI records' },
   { id: 'refunds', label: 'Refunds' }
 ];
 
@@ -32,11 +37,16 @@ export default function Dashboard() {
   const [tab, setTab] = useState('overview');
   const [appointments, setAppointments] = useState([]);
   const [refunds, setRefunds] = useState([]);
+  const [records, setRecords] = useState([]);
   const [refundForm, setRefundForm] = useState({ appointmentId: '', reason: '', emergencyExplanation: '' });
+  const [recordForm, setRecordForm] = useState({ type: 'report', title: '', text: '' });
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   const reload = () => {
     setAppointments(getLocalBookingsForUser(user?.email));
     setRefunds(getLocalRefundsForUser(user?.email));
+    setRecords(getLocalMedicalRecordsForUser(user?.email));
   };
 
   useEffect(() => {
@@ -76,6 +86,43 @@ export default function Dashboard() {
     setTab('refunds');
   };
 
+  const summarizeRecord = async () => {
+    const text = recordForm.text.trim();
+    if (text.length < 12) return toast.error('Paste a little more text for AI to summarize.');
+    setAiLoading(true);
+    try {
+      const endpoint = recordForm.type === 'prescription' ? '/ai/prescription-explain' : recordForm.type === 'note' ? '/ai/doctor-note' : '/ai/report-summary';
+      const payload =
+        recordForm.type === 'prescription'
+          ? { prescriptionText: text }
+          : recordForm.type === 'note'
+            ? { note: text }
+            : { reportText: text };
+      const { data } = await api.post(endpoint, payload);
+      setAiSummary(data.summary || data.explanation || data.formattedNote || '');
+      toast.success('AI summary ready');
+    } catch (error) {
+      toast.error(formatApiError(error));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const saveRecord = () => {
+    if (!aiSummary) return toast.error('Generate an AI summary before saving.');
+    saveLocalMedicalRecord({
+      email: user?.email,
+      type: recordForm.type,
+      title: recordForm.title || `${recordForm.type} summary`,
+      sourceText: recordForm.text,
+      aiSummary
+    });
+    setRecordForm({ type: 'report', title: '', text: '' });
+    setAiSummary('');
+    reload();
+    toast.success('Saved to medical records');
+  };
+
   return (
     <main className="hospital-bg min-h-[calc(100vh-4rem)] py-10">
       <div className="container-pad">
@@ -102,7 +149,7 @@ export default function Dashboard() {
               <MetricCard label="Total visits" value={appointments.length} />
               <MetricCard label="Upcoming" value={upcoming.length} tone="green" />
               <MetricCard label="Active token" value={active?.tokenNumber || '—'} tone="amber" />
-              <MetricCard label="Total paid" value={`INR ${totalPaid}`} tone="rose" />
+              <MetricCard label="AI records" value={records.length} tone="rose" />
             </div>
 
             {active ? (
@@ -155,6 +202,21 @@ export default function Dashboard() {
                 </div>
               </section>
             </div>
+
+            <section className="glass mt-8 rounded-xl p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-medical-600 text-white"><Bot size={20} /></span>
+                  <div>
+                    <h2 className="text-lg font-bold">Smart medical record workspace</h2>
+                    <p className="text-sm text-slate-500">Summarize reports, prescriptions, and doctor notes with local AI, then save them to your portal.</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setTab('records')} className="btn-secondary px-4 py-2">
+                  <Sparkles size={16} /> Open records
+                </button>
+              </div>
+            </section>
           </>
         )}
 
@@ -184,6 +246,80 @@ export default function Dashboard() {
               ))}
             </div>
           </section>
+        )}
+
+        {tab === 'records' && (
+          <div className="mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+            <section className="glass rounded-xl p-5">
+              <div className="flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-medical-600 text-white"><Sparkles size={20} /></span>
+                <div>
+                  <h2 className="text-xl font-bold">AI medical record assistant</h2>
+                  <p className="text-sm text-slate-500">Paste report text, prescription text, or rough doctor notes. The AI explains, formats, or simplifies it safely.</p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-[180px_1fr]">
+                <select className="field" value={recordForm.type} onChange={(e) => setRecordForm((v) => ({ ...v, type: e.target.value }))}>
+                  <option value="report">Report</option>
+                  <option value="prescription">Prescription</option>
+                  <option value="note">Doctor note</option>
+                </select>
+                <input className="field" placeholder="Title, for example: Blood report May 2026" value={recordForm.title} onChange={(e) => setRecordForm((v) => ({ ...v, title: e.target.value }))} />
+              </div>
+              <textarea
+                className="field mt-3 min-h-44 resize-y"
+                placeholder="Paste OCR text, prescription text, or rough notes here..."
+                value={recordForm.text}
+                onChange={(e) => setRecordForm((v) => ({ ...v, text: e.target.value }))}
+              />
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button type="button" onClick={summarizeRecord} disabled={aiLoading} className="btn-primary disabled:cursor-not-allowed disabled:opacity-60">
+                  {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
+                  Generate AI summary
+                </button>
+                <button type="button" onClick={saveRecord} disabled={!aiSummary} className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50">
+                  <Save size={16} /> Save to records
+                </button>
+              </div>
+              <p className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                <ShieldAlert size={16} className="mt-0.5 shrink-0" />
+                AI-generated response. This is for informational purposes only and not a substitute for professional medical advice.
+              </p>
+
+              {aiSummary ? (
+                <div className="mt-5 rounded-xl bg-white/78 p-4 ring-1 ring-white/80">
+                  <p className="mb-2 text-sm font-bold text-medical-700">AI summary preview</p>
+                  <AiResponse text={aiSummary} />
+                </div>
+              ) : null}
+            </section>
+
+            <section className="glass rounded-xl p-5">
+              <div className="flex items-center gap-2"><FileText className="text-medical-600" /><h2 className="text-xl font-bold">Saved medical records</h2></div>
+              <div className="mt-5 space-y-4">
+                {!records.length && (
+                  <div className="rounded-xl bg-white/72 p-5 text-sm text-slate-500 ring-1 ring-white/80">
+                    No AI medical records saved yet. Generate a summary and save it here for future visits.
+                  </div>
+                )}
+                {records.map((record) => (
+                  <article key={record._id} className="rounded-xl bg-white p-4 ring-1 ring-slate-100">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-ink">{record.title}</p>
+                        <p className="text-xs capitalize text-slate-500">{record.type} · {new Date(record.createdAt).toLocaleString()}</p>
+                      </div>
+                      <span className="rounded-full bg-medical-50 px-3 py-1 text-xs font-bold text-medical-700">AI saved</span>
+                    </div>
+                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                      <AiResponse text={record.aiSummary} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </div>
         )}
 
         {tab === 'refunds' && (

@@ -1,0 +1,55 @@
+openapi: 3.0.3
+info:
+  title: JK Hospital API
+  version: 1.0.0
+  description: Production-ready healthcare platform API with versioned endpoints.
+servers:
+  - url: /api/v1
+paths:
+  /health/live:
+    get:
+      summary: Liveness probe
+      responses:
+        "200":
+          description: API process is alive
+  /health/ready:
+    get:
+      summary: Readiness probe
+      responses:
+        "200":
+          description: API dependencies are ready
+        "503":
+          description: One or more dependencies are degraded
+  /auth/login:
+    post:
+      summary: Login with email and password
+      responses:
+        "200":
+          description: Authenticated session
+  /auth/refresh:
+    post:
+      summary: Rotate refresh token and issue a fresh access token
+      responses:
+        "200":
+          description: Token refreshed
+  /doctors:
+    get:
+      summary: List doctors
+      responses:
+        "200":
+          description: Doctor list
+  /appointments:
+    post:
+      summary: Create an appointment after payment confirmation
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Appointment created
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

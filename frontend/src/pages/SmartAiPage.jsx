@@ -1,0 +1,267 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  AlertTriangle,
+  Bot,
+  ClipboardPenLine,
+  Eraser,
+  FileText,
+  HelpCircle,
+  Loader2,
+  MessageSquareText,
+  Mic,
+  Pill,
+  Route,
+  Send,
+  Sparkles
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
+import api, { formatApiError } from '../api/client.js';
+import AiResponse from '../components/ai/AiResponse.jsx';
+
+const disclaimer = 'AI-generated response. This is for informational purposes only and not a substitute for professional medical advice.';
+const AI_MESSAGES_KEY = 'jk_ai_messages';
+const AI_SESSION_KEY = 'jk_ai_session_id';
+
+const createAiSessionId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+
+const tools = [
+  { id: 'chat', label: 'Chatbot', icon: MessageSquareText, placeholder: 'Ask about symptoms, departments, visiting hours, appointment steps, or hospital FAQs...' },
+  { id: 'symptom', label: 'Department', icon: Route, placeholder: 'Example: I have chest pain and shortness of breath' },
+  { id: 'triage', label: 'Triage', icon: AlertTriangle, placeholder: 'Describe urgent symptoms for severity guidance...' },
+  { id: 'report', label: 'Report', icon: FileText, placeholder: 'Paste report text or OCR result here...' },
+  { id: 'prescription', label: 'Prescription', icon: Pill, placeholder: 'Paste prescription text. AI will explain purpose and precautions, not dosage.' },
+  { id: 'doctor-note', label: 'Doctor Note', icon: ClipboardPenLine, placeholder: 'Example: fever 3 days bp normal...' },
+  { id: 'faq', label: 'FAQ', icon: HelpCircle, placeholder: 'Ask about ambulance, insurance, departments, admission, timings...' }
+];
+
+const quickActions = [
+  { tool: 'triage', label: 'Chest pain help', prompt: 'I have chest pain and shortness of breath. What should I do right now?' },
+  { tool: 'symptom', label: 'Find department', prompt: 'I have fever, cough, and body pain for three days.' },
+  { tool: 'faq', label: 'Ambulance info', prompt: 'What is the ambulance or emergency contact for JK Hospital?' },
+  { tool: 'report', label: 'Explain report', prompt: 'Hemoglobin 10.2 g/dL, WBC 8200, Platelets 2.5 lakh. Please explain in simple words.' }
+];
+
+const initialAssistantMessage = {
+  role: 'assistant',
+  text: `Hello, I am JK Hospital's local AI assistant powered by Ollama. I can help with department suggestions, visit prep, reports, prescriptions, FAQs, and emergency guidance.\n\n${disclaimer}`
+};
+
+const endpointByTool = {
+  chat: '/ai/chat',
+  symptom: '/ai/symptom-route',
+  triage: '/ai/triage',
+  report: '/ai/report-summary',
+  prescription: '/ai/prescription-explain',
+  'doctor-note': '/ai/doctor-note',
+  faq: '/ai/faq'
+};
+
+const bodyByTool = (tool, input, sessionId) => {
+  if (tool === 'chat') return { message: input, sessionId };
+  if (tool === 'symptom' || tool === 'triage') return { symptoms: input };
+  if (tool === 'report') return { reportText: input };
+  if (tool === 'prescription') return { prescriptionText: input };
+  if (tool === 'doctor-note') return { note: input };
+  return { question: input };
+};
+
+const responseText = (tool, payload) => {
+  if (tool === 'chat') return payload.message;
+  if (tool === 'report') return payload.summary;
+  if (tool === 'prescription') return payload.explanation;
+  if (tool === 'doctor-note') return payload.formattedNote;
+  if (tool === 'faq') return payload.answer;
+  const result = payload.result || {};
+  if (tool === 'symptom') {
+    return `**Recommended department:** ${result.department || 'General Medicine'}\n\n**Urgency:** ${result.urgency || 'routine'}\n\n${result.reason || ''}\n\n${(result.redFlags || []).map((item) => `- ${item}`).join('\n')}\n\n${result.disclaimer || disclaimer}`;
+  }
+  return `**Severity:** ${result.severity || 'medium'}\n\n**Recommended department:** ${result.recommendedDepartment || 'Emergency Medicine'}\n\n${result.reason || ''}\n\n**Immediate action:** ${result.immediateAction || 'Seek medical attention if symptoms are severe or worsening.'}\n\n${(result.redFlags || []).map((item) => `- ${item}`).join('\n')}\n\n${result.disclaimer || disclaimer}`;
+};
+
+const offlineResponse = (tool) => {
+  if (tool === 'faq') {
+    return `Local AI is unavailable right now, but the hospital platform is still online.\n\nFor emergencies, contact JK Hospital at 7845265507. For timings, insurance, admissions, and department availability, please confirm with the hospital desk.\n\nTo restore AI answers, start Ollama and make sure gemma3:4b is available on port 11434.\n\n${disclaimer}`;
+  }
+  return `Local AI is unavailable right now. Please start Ollama and make sure gemma3:4b is running on http://127.0.0.1:11434.\n\nTry:\n\nollama serve\nollama pull gemma3:4b\n\n${disclaimer}`;
+};
+
+export default function SmartAiPage() {
+  const [activeTool, setActiveTool] = useState('chat');
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState(() => {
+    const saved = JSON.parse(sessionStorage.getItem(AI_MESSAGES_KEY) || 'null');
+    return saved?.length ? saved : [initialAssistantMessage];
+  });
+  const [loading, setLoading] = useState(false);
+  const [config, setConfig] = useState(null);
+  const scrollRef = useRef(null);
+  const [sessionId, setSessionId] = useState(() => {
+    const saved = sessionStorage.getItem(AI_SESSION_KEY);
+    if (saved) return saved;
+    const next = createAiSessionId();
+    sessionStorage.setItem(AI_SESSION_KEY, next);
+    return next;
+  });
+  const active = tools.find((tool) => tool.id === activeTool) || tools[0];
+  const activeProvider = config?.providers?.find((item) => item.active);
+
+  useEffect(() => {
+    api.get('/ai/config').then(({ data }) => setConfig(data)).catch(() => setConfig(null));
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    sessionStorage.setItem(AI_MESSAGES_KEY, JSON.stringify(messages.slice(-18)));
+  }, [messages, loading]);
+
+  const send = async (overrideText, overrideTool) => {
+    const tool = overrideTool || activeTool;
+    const text = String(overrideText ?? input).trim();
+    if (text.length < 2) return toast.error('Type a little more detail for the AI assistant.');
+    if (!overrideText) setInput('');
+    setLoading(true);
+    setMessages((current) => [...current, { role: 'user', text, tool }]);
+    try {
+      const { data } = await api.post(endpointByTool[tool], bodyByTool(tool, text, sessionId));
+      setMessages((current) => [...current, { role: 'assistant', text: responseText(tool, data), tool }]);
+    } catch (error) {
+      toast.error(formatApiError(error));
+      setMessages((current) => [
+        ...current,
+        { role: 'assistant', text: offlineResponse(tool), error: true }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const useQuickAction = (action) => {
+    setActiveTool(action.tool);
+    setInput(action.prompt);
+    void send(action.prompt, action.tool);
+  };
+
+  const clearConversation = () => {
+    sessionStorage.removeItem(AI_MESSAGES_KEY);
+    const nextSessionId = createAiSessionId();
+    sessionStorage.setItem(AI_SESSION_KEY, nextSessionId);
+    setSessionId(nextSessionId);
+    setMessages([initialAssistantMessage]);
+    setInput('');
+  };
+
+  return (
+    <main className="hospital-bg min-h-[calc(100vh-4rem)] py-8">
+      <div className="container-pad">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <span className="live-badge inline-flex items-center gap-2"><Sparkles size={14} /> Local Gemma AI</span>
+            <h1 className="mt-4 text-3xl font-bold text-ink md:text-5xl">Smart Hospital AI</h1>
+            <p className="mt-2 max-w-3xl text-slate-600">Private local assistance for patients, doctors, and hospital operations with safety-first medical guardrails.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {quickActions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => useQuickAction(action)}
+                  className="rounded-full bg-white/78 px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-white/80 transition hover:bg-medical-50 hover:text-medical-700"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl bg-white/76 px-4 py-3 text-sm font-semibold text-slate-600 ring-1 ring-white/80">
+            <span className={`mr-2 inline-flex h-2 w-2 rounded-full ${config ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            Provider: <span className="text-medical-700">{activeProvider?.name || 'ollama'}</span>
+            <span className="mx-2 text-slate-300">/</span>
+            Model: <span className="text-medical-700">{activeProvider?.model || 'gemma3:4b'}</span>
+          </div>
+        </div>
+
+        <div className="mt-7 grid gap-5 lg:grid-cols-[260px_1fr]">
+          <aside className="glass rounded-xl p-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              {tools.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTool(id)}
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold transition ${activeTool === id ? 'bg-medical-600 text-white shadow-soft' : 'bg-white/70 text-slate-600 hover:bg-white'}`}
+                >
+                  <Icon size={18} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <section className="ai-console glass rounded-xl">
+            <div className="flex items-center justify-between border-b border-white/70 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-medical-600 text-white"><Bot size={20} /></span>
+                <div>
+                  <p className="font-bold text-ink">{active.label} assistant</p>
+                  <p className="text-xs text-slate-500">Voice-ready interface with local AI processing</p>
+                </div>
+              </div>
+              <button type="button" className="btn-secondary px-3 py-2" title="Voice input ready for browser speech APIs">
+                <Mic size={16} />
+              </button>
+              <button type="button" onClick={clearConversation} className="btn-secondary px-3 py-2" title="Clear conversation">
+                <Eraser size={16} />
+              </button>
+            </div>
+
+            <div ref={scrollRef} className="ai-chat-scroll max-h-[58vh] min-h-[430px] overflow-y-auto px-5 py-5">
+              <AnimatePresence initial={false}>
+                {messages.map((message, index) => (
+                  <motion.div
+                    key={`${message.role}-${index}-${message.text.slice(0, 12)}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className={`mb-4 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${message.role === 'user' ? 'bg-medical-600 text-white' : message.error ? 'bg-rose-50 text-rose-800 ring-1 ring-rose-100' : 'bg-white/82 text-slate-700 ring-1 ring-white/90'}`}>
+                      <AiResponse text={message.text} />
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {loading ? (
+                <div className="flex items-center gap-2 rounded-2xl bg-white/76 px-4 py-3 text-sm font-semibold text-slate-500 ring-1 ring-white/90">
+                  <Loader2 size={16} className="animate-spin text-medical-600" />
+                  Gemma is thinking...
+                </div>
+              ) : null}
+            </div>
+
+            <div className="border-t border-white/70 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <textarea
+                  className="field min-h-24 flex-1 resize-none"
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      send();
+                    }
+                  }}
+                  placeholder={active.placeholder}
+                />
+                <button type="button" onClick={send} disabled={loading} className="btn-primary self-stretch px-5 disabled:cursor-not-allowed disabled:opacity-60">
+                  {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  Send
+                </button>
+              </div>
+              <p className="mt-3 text-xs font-semibold text-slate-500">{disclaimer}</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}

@@ -22,9 +22,9 @@ export const fadeIn3D = {
 };
 
 export const page3D = {
-  initial: { opacity: 0, y: 24, rotateX: 4, scale: 0.98 },
-  animate: { opacity: 1, y: 0, rotateX: 0, scale: 1, transition: { duration: 0.45, ease } },
-  exit: { opacity: 0, y: -16, rotateX: -3, scale: 0.99, transition: { duration: 0.32, ease } }
+  initial: { opacity: 0, y: 10, filter: 'blur(6px)' },
+  animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.34, ease } },
+  exit: { opacity: 0, y: -6, filter: 'blur(4px)', transition: { duration: 0.16, ease } }
 };
 
 export const staggerContainer = {

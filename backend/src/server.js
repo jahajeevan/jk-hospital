@@ -1,25 +1,49 @@
 import './utils/networkFix.js';
-import dotenv from 'dotenv';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:http';
 import app from './app.js';
 import { connectDB } from './config/db.js';
+import { env, validateEnv } from './config/env.js';
+import { initRealtime } from './modules/realtime/socket.js';
+import { logger } from './utils/logger.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+validateEnv();
 
-dotenv.config({ path: resolve(__dirname, '../.env') });
+const shutdown = async (server, signal) => {
+  logger.info({ signal }, 'shutdown requested');
+  server.close(async () => {
+    logger.info('shutdown complete');
+    process.exit(0);
+  });
 
-const PORT = process.env.PORT || 5001;
+  setTimeout(() => {
+    logger.error('forced shutdown after timeout');
+    process.exit(1);
+  }, 10_000).unref();
+};
 
 await connectDB();
 
-app.listen(PORT, async () => {
-  console.log(`JK Hospital API running on port ${PORT}`);
+const server = createServer(app);
+initRealtime(server);
+
+server.listen(env.port, async () => {
+  logger.info({ port: env.port }, 'JK Hospital API running');
   try {
     const { probeStripe, probeRazorpay } = await import('./utils/paymentGatewayHealth.js');
     const [s, r] = await Promise.all([probeStripe(), probeRazorpay()]);
-    console.log(`Payments: Stripe ${s.reachable ? 'OK' : 'unreachable'} | Razorpay ${r.reachable ? 'OK' : 'unreachable'}`);
+    logger.info({ stripe: s.reachable, razorpay: r.reachable }, 'payment gateway startup probe complete');
   } catch {
     /* optional startup probe */
   }
+});
+
+process.on('SIGTERM', () => shutdown(server, 'SIGTERM'));
+process.on('SIGINT', () => shutdown(server, 'SIGINT'));
+process.on('unhandledRejection', (error) => {
+  logger.error({ error }, 'unhandled promise rejection');
+  shutdown(server, 'unhandledRejection');
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ error }, 'uncaught exception');
+  process.exit(1);
 });

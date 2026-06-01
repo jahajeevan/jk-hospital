@@ -1,83 +1,183 @@
-import Appointment from '../models/Appointment.js';
-import Doctor from '../models/Doctor.js';
-import Payment from '../models/Payment.js';
-import RefundRequest from '../models/RefundRequest.js';
-import User from '../models/User.js';
+import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
 import { sendStatusEmail } from '../services/emailService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const overview = asyncHandler(async (_req, res) => {
-  const [appointments, patients, refunds, revenue] = await Promise.all([
-    Appointment.countDocuments(),
-    User.countDocuments({ role: 'patient' }),
-    RefundRequest.countDocuments({ status: 'pending' }),
-    Payment.aggregate([{ $match: { status: 'success' } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
+  const [
+    { count: appointments },
+    { count: patients },
+    { count: refunds },
+    { data: paymentsData }
+  ] = await Promise.all([
+    supabase.from('appointments').select('*', { count: 'exact', head: true }).is('deleted_at', null),
+    supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'patient').is('deleted_at', null),
+    supabase.from('refund_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending').is('deleted_at', null),
+    supabase.from('payments').select('amount').eq('status', 'success').is('deleted_at', null)
   ]);
 
-  const doctorOccupancy = await Appointment.aggregate([
-    { $match: { status: { $nin: ['cancelled', 'rejected'] } } },
-    { $group: { _id: '$doctor', count: { $sum: 1 } } },
-    { $lookup: { from: 'doctors', localField: '_id', foreignField: '_id', as: 'doctor' } },
-    { $unwind: '$doctor' },
-    { $project: { name: '$doctor.name', count: 1 } }
-  ]);
+  const revenue = paymentsData?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
-  const dailyBookings = await Appointment.aggregate([
-    { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
-    { $sort: { _id: 1 } },
-    { $limit: 14 }
-  ]);
+  // doctorOccupancy
+  const { data: apts } = await supabase
+    .from('appointments')
+    .select('doctor_id, doctor:doctors(name)')
+    .not('status', 'in', '("cancelled","rejected")')
+    .is('deleted_at', null);
+
+  const occupancyMap = {};
+  for (const apt of apts || []) {
+    const docName = apt.doctor?.name || 'Unknown';
+    occupancyMap[docName] = (occupancyMap[docName] || 0) + 1;
+  }
+  const doctorOccupancy = Object.entries(occupancyMap).map(([name, count]) => ({ name, count }));
+
+  // dailyBookings
+  const { data: createdApts } = await supabase
+    .from('appointments')
+    .select('created_at')
+    .is('deleted_at', null);
+
+  const dailyMap = {};
+  for (const apt of createdApts || []) {
+    const dateStr = new Date(apt.created_at).toISOString().slice(0, 10);
+    dailyMap[dateStr] = (dailyMap[dateStr] || 0) + 1;
+  }
+  const dailyBookings = Object.entries(dailyMap)
+    .map(([_id, count]) => ({ _id, count }))
+    .sort((a, b) => a._id.localeCompare(b._id))
+    .slice(0, 14);
 
   res.json({
-    stats: { appointments, patients, pendingRefunds: refunds, revenue: revenue[0]?.total || 0 },
+    stats: { appointments: appointments || 0, patients: patients || 0, pendingRefunds: refunds || 0, revenue },
     doctorOccupancy,
     dailyBookings
   });
 });
 
 export const allBookings = asyncHandler(async (_req, res) => {
-  const appointments = await Appointment.find().populate('doctor').populate('patient', 'name email phone').populate('payment').sort({ createdAt: -1 });
-  res.json({ appointments });
+  const { data: appointmentsData } = await supabase
+    .from('appointments')
+    .select('*, doctor:doctors(*), patient:users(*), payment:payments(*)')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+
+  res.json({ appointments: toCamelObj(appointmentsData) || [] });
 });
 
 export const upsertDoctor = asyncHandler(async (req, res) => {
-  const doctor = req.params.id ? await Doctor.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }) : await Doctor.create(req.body);
-  res.status(req.params.id ? 200 : 201).json({ doctor });
+  const slots = req.body.slots || [];
+  const bodyCopy = { ...req.body };
+  delete bodyCopy.slots;
+
+  let doctor;
+  if (req.params.id) {
+    const { data: docList, error: docErr } = await supabase
+      .from('doctors')
+      .update(toSnakeObj(bodyCopy))
+      .eq('id', req.params.id)
+      .select('*');
+    if (docErr) throw docErr;
+    doctor = toCamelObj(docList?.[0]);
+  } else {
+    const { data: docList, error: docErr } = await supabase
+      .from('doctors')
+      .insert(toSnakeObj(bodyCopy))
+      .select('*');
+    if (docErr) throw docErr;
+    doctor = toCamelObj(docList?.[0]);
+  }
+
+  // Sync slots to relational table
+  if (slots.length && doctor?.id) {
+    await supabase.from('doctor_slots').delete().eq('doctor_id', doctor.id);
+    const slotsToInsert = slots.map((s) => {
+      const mapped = toSnakeObj(s);
+      mapped.doctor_id = doctor.id;
+      delete mapped.id;
+      delete mapped._id;
+      return mapped;
+    });
+    const { error: slotsErr } = await supabase.from('doctor_slots').insert(slotsToInsert);
+    if (slotsErr) throw slotsErr;
+  }
+
+  // Fetch full populated doctor with slots
+  const { data: fullDoc } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .eq('id', doctor.id)
+    .limit(1);
+
+  res.status(req.params.id ? 200 : 201).json({ doctor: toCamelObj(fullDoc?.[0]) });
 });
 
 export const deleteDoctor = asyncHandler(async (req, res) => {
-  await Doctor.findByIdAndDelete(req.params.id);
+  const { error } = await supabase.from('doctors').delete().eq('id', req.params.id);
+  if (error) throw error;
   res.json({ message: 'Doctor deleted' });
 });
 
 export const updateAppointmentStatus = asyncHandler(async (req, res) => {
-  const appointment = await Appointment.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true }).populate('patient');
+  const { data: apts, error: updateError } = await supabase
+    .from('appointments')
+    .update(toSnakeObj({ status: req.body.status }))
+    .eq('id', req.params.id)
+    .select('*, patient:users(*)');
+
+  if (updateError) throw updateError;
+  const appointment = toCamelObj(apts?.[0]);
   if (!appointment) {
     const error = new Error('Appointment not found');
     error.statusCode = 404;
     throw error;
   }
+
   await sendStatusEmail(appointment.patient.email, `JK Hospital Appointment ${appointment.status}`, `Your appointment status is now ${appointment.status}.`);
   res.json({ appointment });
 });
 
 export const markDoctorLeave = asyncHandler(async (req, res) => {
-  const doctor = await Doctor.findById(req.params.id);
+  const { data: doctors } = await supabase
+    .from('doctors')
+    .select('*')
+    .eq('id', req.params.id)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const doctor = toCamelObj(doctors?.[0]);
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;
     throw error;
   }
 
-  doctor.isAvailable = false;
-  doctor.unavailableDates.push(new Date(req.body.date || Date.now()));
-  await doctor.save();
+  const leaveDate = new Date(req.body.date || Date.now());
+  const unavailableDates = doctor.unavailableDates || [];
+  const dateStr = leaveDate.toISOString().slice(0, 10);
+  if (!unavailableDates.includes(dateStr)) {
+    unavailableDates.push(dateStr);
+  }
 
-  const affected = await Appointment.find({
-    doctor: doctor._id,
-    appointmentDate: new Date(req.body.date),
-    status: { $in: ['confirmed', 'approved', 'rescheduled'] }
-  }).populate('patient');
+  const { data: docList, error: updateErr } = await supabase
+    .from('doctors')
+    .update(toSnakeObj({
+      isAvailable: false,
+      unavailableDates
+    }))
+    .eq('id', doctor.id)
+    .select('*');
+
+  if (updateErr) throw updateErr;
+
+  const { data: affectedApts } = await supabase
+    .from('appointments')
+    .select('*, patient:users(*)')
+    .eq('doctor_id', doctor.id)
+    .eq('appointment_date', dateStr)
+    .in('status', ['confirmed', 'approved', 'rescheduled'])
+    .is('deleted_at', null);
+
+  const affected = toCamelObj(affectedApts) || [];
 
   await Promise.all(
     affected.map((appointment) =>
@@ -85,6 +185,5 @@ export const markDoctorLeave = asyncHandler(async (req, res) => {
     )
   );
 
-  res.json({ doctor, affectedPatients: affected.length });
+  res.json({ doctor: toCamelObj(docList?.[0]), affectedPatients: affected.length });
 });
-

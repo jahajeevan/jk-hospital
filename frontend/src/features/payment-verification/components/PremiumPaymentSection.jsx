@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatApiError } from '../../../api/client.js';
 import { normalizeFee } from '../../../utils/paymentRules.js';
+import { isValidIndianMobile } from '../../../utils/validation.js';
 import { usePaymentVerification } from '../hooks/usePaymentVerification.js';
 import {
   createRazorpayOrder,
@@ -101,18 +102,27 @@ export default function PremiumPaymentSection({ booking, user }) {
   useEffect(() => {
     fetchPaymentConfig()
       .then((config) => {
-        setProviders({
+        const nextProviders = {
           razorpay: Boolean(config.razorpay),
           stripe: Boolean(config.stripe)
-        });
-        if (config.razorpay) setGateway('razorpay');
-        else if (config.stripe) setGateway('stripe');
+        };
+        setProviders(nextProviders);
+        if (nextProviders.razorpay) setGateway('razorpay');
+        else if (nextProviders.stripe) setGateway('stripe');
+        else setCheckoutError('No online payment gateway is configured. Add Razorpay or Stripe keys in backend/.env and restart the server.');
       })
-      .catch(() => {
-        setProviders({ razorpay: true, stripe: true });
+      .catch((error) => {
+        setProviders({ razorpay: false, stripe: false });
+        setCheckoutError(formatApiError(error));
       })
       .finally(() => setConfigLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (configLoading) return;
+    if (gateway === 'razorpay' && !providers.razorpay && providers.stripe) setGateway('stripe');
+    if (gateway === 'stripe' && !providers.stripe && providers.razorpay) setGateway('razorpay');
+  }, [configLoading, gateway, providers]);
 
   /** Handle Stripe return URL: ?local_session_id=cs_... */
   useEffect(() => {
@@ -221,11 +231,28 @@ export default function PremiumPaymentSection({ booking, user }) {
 
   const startCheckout = () => {
     setCheckoutError('');
+    if (!providers.razorpay && !providers.stripe) {
+      setCheckoutError('No online payment gateway is configured. Add Razorpay or Stripe keys in backend/.env and restart the server.');
+      return;
+    }
+    if (gateway === 'razorpay' && !providers.razorpay) {
+      setCheckoutError('Razorpay is not configured. Choose Stripe or update Razorpay keys in backend/.env.');
+      return;
+    }
+    if (gateway === 'stripe' && !providers.stripe) {
+      setCheckoutError('Stripe is not configured. Choose Razorpay or update Stripe keys in backend/.env.');
+      return;
+    }
+    if (!isValidIndianMobile(booking?.patient?.phone)) {
+      setCheckoutError('Enter a valid 10-digit mobile number before payment. Razorpay will use this contact for the payment.');
+      return;
+    }
     if (gateway === 'stripe') return startStripeCheckout();
     return startRazorpayCheckout();
   };
 
-  const payDisabled = checkoutLoading || isProcessing || configLoading;
+  const noGatewayConfigured = !providers.razorpay && !providers.stripe;
+  const payDisabled = checkoutLoading || isProcessing || configLoading || noGatewayConfigured;
   const showModal = isProcessing || status === 'success' || status === 'failure';
 
   return (
@@ -368,7 +395,11 @@ export default function PremiumPaymentSection({ booking, user }) {
                   ? gateway === 'stripe'
                     ? 'Opening Stripe Checkout…'
                     : 'Opening Razorpay…'
-                  : gateway === 'stripe'
+                  : configLoading
+                    ? 'Checking payment gateways…'
+                    : noGatewayConfigured
+                      ? 'Payment gateway not configured'
+                      : gateway === 'stripe'
                     ? 'Pay securely with Stripe'
                     : `Pay with Razorpay · ${paymentModes.find((m) => m.id === selectedMode)?.label}`}
             </button>

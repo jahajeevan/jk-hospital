@@ -9,8 +9,8 @@ export default function BookingStepper({ steps, current }) {
         return (
           <li
             key={step}
-            className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-sm font-semibold transition ${
-              active ? 'border-medical-500 bg-medical-50 text-medical-800' : done ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'
+            className={`liquid-option flex items-center gap-3 rounded-lg border px-3 py-3 text-sm font-semibold transition ${
+              active ? 'liquid-option-active text-medical-800' : done ? 'border-emerald-200 bg-emerald-50/60 text-emerald-800' : 'text-slate-500'
             }`}
           >
             <span
