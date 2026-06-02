@@ -1,3 +1,7 @@
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 const COOKIE_NAME = 'site_access';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 

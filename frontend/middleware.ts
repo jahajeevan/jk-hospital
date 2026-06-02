@@ -1,5 +1,9 @@
 import { next } from '@vercel/functions';
 
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 const COOKIE_NAME = 'site_access';
 const PUBLIC_FILE = /\.(.*)$/;
 
@@ -38,8 +42,6 @@ async function hasValidAccess(request: Request) {
 function isExcludedPath(pathname: string) {
   return (
     pathname === '/access' ||
-    pathname === '/admin/login' ||
-    pathname === '/admin' ||
     pathname === '/api/access' ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/_next') ||

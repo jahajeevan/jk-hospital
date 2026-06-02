@@ -1,9 +1,9 @@
-import { SignIn, SignUp, useUser } from '@clerk/clerk-react';
+import { SignIn, SignUp, useClerk, useUser } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
 import { MailCheck, ShieldCheck, Sparkles, UserPlus, Lock } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -54,15 +54,41 @@ export default function AuthPage({ mode }) {
   const isSignup = mode === 'signup';
   const isAdminLogin = mode === 'admin';
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signOut } = useClerk();
   const { isSignedIn } = useUser();
   const { isAdmin, user } = useAuth();
+  const handledAdminMismatch = useRef(false);
+
+  useEffect(() => {
+    if (location.state?.adminDenied) {
+      toast.error('You are not an admin. Please use the patient login.');
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state?.adminDenied, navigate]);
 
   useEffect(() => {
     if (isSignedIn && user) {
+      if (isAdminLogin && !isAdmin) {
+        if (handledAdminMismatch.current) return;
+        handledAdminMismatch.current = true;
+
+        const redirectToPatientLogin = async () => {
+          await signOut();
+          navigate('/login', {
+            replace: true,
+            state: { adminDenied: true }
+          });
+        };
+
+        void redirectToPatientLogin();
+        return;
+      }
+
       toast.success(isSignup ? 'Signup verified successfully' : 'Login successful');
-      navigate(isAdminLogin && isAdmin ? '/admin' : '/dashboard', { replace: true });
+      navigate(isAdminLogin ? '/admin' : '/dashboard', { replace: true });
     }
-  }, [isSignedIn, isSignup, isAdminLogin, isAdmin, navigate, user]);
+  }, [isSignedIn, isSignup, isAdminLogin, isAdmin, navigate, signOut, user]);
 
   return (
     <main className="auth-shell min-h-[calc(100vh-4rem)]">
