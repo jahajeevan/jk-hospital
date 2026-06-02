@@ -4,21 +4,13 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
-const COOKIE_NAME = 'site_access';
 const PUBLIC_FILE = /\.(.*)$/;
 const ACCESS_TOKEN_VERSION = 'v2';
+const ACCESS_TOKEN_TTL_MS = 10_000;
 
-function getCookie(request: Request, name: string) {
-  const cookieHeader = request.headers.get('cookie') || '';
-  const cookies = cookieHeader.split(';').map((cookie) => cookie.trim());
-  const match = cookies.find((cookie) => cookie.startsWith(`${name}=`));
-
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
-}
-
-async function createAccessToken(password: string) {
+async function createAccessToken(password: string, timestamp: number) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(`jk-hospital-site-access:${ACCESS_TOKEN_VERSION}:${password}`);
+  const data = encoder.encode(`jk-hospital-site-access:${ACCESS_TOKEN_VERSION}:${timestamp}:${password}`);
   const digest = await crypto.subtle.digest('SHA-256', data);
 
   return Array.from(new Uint8Array(digest))
@@ -31,13 +23,16 @@ async function hasValidAccess(request: Request) {
 
   if (!sitePassword) return false;
 
-  const cookieValue = getCookie(request, COOKIE_NAME);
+  const url = new URL(request.url);
+  const accessToken = url.searchParams.get('access') || '';
+  const [timestampValue, signature] = accessToken.split('.');
+  const timestamp = Number(timestampValue);
 
-  if (!cookieValue) return false;
+  if (!timestamp || !signature || Date.now() - timestamp > ACCESS_TOKEN_TTL_MS) return false;
 
-  const expectedValue = await createAccessToken(sitePassword);
+  const expectedValue = await createAccessToken(sitePassword, timestamp);
 
-  return cookieValue === expectedValue;
+  return accessToken === expectedValue;
 }
 
 function isExcludedPath(pathname: string) {

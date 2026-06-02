@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AppLayout from './layouts/AppLayout.jsx';
@@ -30,6 +30,15 @@ function ScreenLoader() {
 }
 
 export default function App() {
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('access')) return;
+
+    url.searchParams.delete('access');
+    const nextPath = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, document.title, nextPath || '/');
+  }, []);
+
   return (
     <Routes>
       <Route path="/access" element={<Suspense fallback={<ScreenLoader />}><AccessPage /></Suspense>} />

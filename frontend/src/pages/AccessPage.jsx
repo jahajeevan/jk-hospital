@@ -27,8 +27,9 @@ export default function AccessPage() {
         return;
       }
 
-      navigate('/', { replace: true });
-      window.location.assign('/');
+      const redirectTo = typeof data?.redirectTo === 'string' ? data.redirectTo : '/';
+      navigate(redirectTo, { replace: true });
+      window.location.assign(redirectTo);
     } catch {
       setError('Unable to verify the password. Please try again.');
     } finally {

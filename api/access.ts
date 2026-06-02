@@ -2,28 +2,22 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
-const COOKIE_NAME = 'site_access';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 const ACCESS_TOKEN_VERSION = 'v2';
+const ACCESS_TOKEN_TTL_MS = 10_000;
 
 export const config = {
   runtime: 'edge'
 };
 
-async function createAccessToken(password: string) {
+async function createAccessToken(password: string, timestamp: number) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(`jk-hospital-site-access:${ACCESS_TOKEN_VERSION}:${password}`);
+  const data = encoder.encode(`jk-hospital-site-access:${ACCESS_TOKEN_VERSION}:${timestamp}:${password}`);
   const digest = await crypto.subtle.digest('SHA-256', data);
-
-  return Array.from(new Uint8Array(digest))
+  const signature = Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
-}
 
-function serializeAccessCookie(value: string) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-
-  return `${COOKIE_NAME}=${value}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax${secure}`;
+  return `${timestamp}.${signature}`;
 }
 
 export default async function handler(request: Request) {
@@ -45,14 +39,13 @@ export default async function handler(request: Request) {
       return Response.json({ error: 'Invalid password.' }, { status: 401 });
     }
 
-    const accessToken = await createAccessToken(sitePassword);
+    const accessToken = await createAccessToken(sitePassword, Date.now());
 
     return Response.json(
-      { success: true },
       {
-        headers: {
-          'Set-Cookie': serializeAccessCookie(accessToken)
-        }
+        success: true,
+        redirectTo: `/?access=${encodeURIComponent(accessToken)}`,
+        expiresInMs: ACCESS_TOKEN_TTL_MS
       }
     );
   } catch {
