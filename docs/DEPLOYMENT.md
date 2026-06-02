@@ -29,6 +29,7 @@ Open `http://localhost:8080` and verify:
 ## Cloud Targets
 
 - Vercel/Netlify: deploy `frontend`, set `VITE_API_URL=https://api.jahajeevan.me/api`.
+- Vercel/Netlify: set `VITE_CLERK_PUBLISHABLE_KEY` to the live Clerk key for `clerk.jahajeevan.me`. A key for a misspelled Clerk domain will make the React app render the generic "workspace" error screen.
 - Render/Railway/Fly/VPS: deploy `backend/Dockerfile`, set Supabase, Clerk, Razorpay, email, Redis, and AI environment variables.
 - AWS/Azure/GCP: run API containers behind a load balancer, serve frontend via object storage/CDN, and use Supabase for the production database.
 

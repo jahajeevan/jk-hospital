@@ -64,18 +64,9 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    if (!isLoaded) return;
-
-    if (freshBrowserSession.current && isSignedIn) {
-      freshBrowserSession.current = false;
-      sessionStorage.clear();
-      void signOut();
-      return;
-    }
-
-    if (!isSignedIn) freshBrowserSession.current = false;
-    sessionStorage.setItem(BROWSER_SESSION_KEY, 'active');
-  }, [isLoaded, isSignedIn, signOut]);
+  if (!isLoaded) return;
+  sessionStorage.setItem(BROWSER_SESSION_KEY, 'active');
+}, [isLoaded]);
 
   useEffect(() => {
     if (!isLoaded) return;
