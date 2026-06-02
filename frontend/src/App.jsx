@@ -5,6 +5,7 @@ import AppLayout from './layouts/AppLayout.jsx';
 import Home from './pages/Home.jsx';
 
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+const AccessPage = lazy(() => import('./pages/AccessPage.jsx'));
 const AuthPage = lazy(() => import('./pages/AuthPage.jsx'));
 const BookingPage = lazy(() => import('./pages/BookingPage.jsx'));
 const CompleteProfilePage = lazy(() => import('./pages/CompleteProfilePage.jsx'));
@@ -31,6 +32,7 @@ function ScreenLoader() {
 export default function App() {
   return (
     <Routes>
+      <Route path="/access" element={<Suspense fallback={<ScreenLoader />}><AccessPage /></Suspense>} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Suspense fallback={<ScreenLoader />}><AuthPage mode="login" /></Suspense>} />
