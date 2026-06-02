@@ -6,6 +6,7 @@ declare const process: {
 
 const COOKIE_NAME = 'site_access';
 const PUBLIC_FILE = /\.(.*)$/;
+const ACCESS_TOKEN_VERSION = 'v2';
 
 function getCookie(request: Request, name: string) {
   const cookieHeader = request.headers.get('cookie') || '';
@@ -17,7 +18,7 @@ function getCookie(request: Request, name: string) {
 
 async function createAccessToken(password: string) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(`jk-hospital-site-access:${password}`);
+  const data = encoder.encode(`jk-hospital-site-access:${ACCESS_TOKEN_VERSION}:${password}`);
   const digest = await crypto.subtle.digest('SHA-256', data);
 
   return Array.from(new Uint8Array(digest))

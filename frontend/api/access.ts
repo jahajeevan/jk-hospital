@@ -4,6 +4,7 @@ declare const process: {
 
 const COOKIE_NAME = 'site_access';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+const ACCESS_TOKEN_VERSION = 'v2';
 
 export const config = {
   runtime: 'edge'
@@ -11,7 +12,7 @@ export const config = {
 
 async function createAccessToken(password: string) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(`jk-hospital-site-access:${password}`);
+  const data = encoder.encode(`jk-hospital-site-access:${ACCESS_TOKEN_VERSION}:${password}`);
   const digest = await crypto.subtle.digest('SHA-256', data);
 
   return Array.from(new Uint8Array(digest))
