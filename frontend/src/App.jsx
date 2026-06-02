@@ -37,6 +37,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Suspense fallback={<ScreenLoader />}><AuthPage mode="login" /></Suspense>} />
         <Route path="/signup" element={<Suspense fallback={<ScreenLoader />}><AuthPage mode="signup" /></Suspense>} />
+        <Route path="/admin/login" element={<Suspense fallback={<ScreenLoader />}><AuthPage mode="admin" /></Suspense>} />
         <Route path="/services" element={<Suspense fallback={<ScreenLoader />}><Services /></Suspense>} />
         <Route path="/ai" element={<Suspense fallback={<ScreenLoader />}><SmartAiPage /></Suspense>} />
         <Route path="/doctors" element={<Suspense fallback={<ScreenLoader />}><Doctors /></Suspense>} />

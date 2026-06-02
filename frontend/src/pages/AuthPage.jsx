@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const perks = [
   { icon: MailCheck, title: 'Email OTP', desc: 'Verified by Clerk' },
@@ -51,15 +52,17 @@ const clerkAppearance = {
 
 export default function AuthPage({ mode }) {
   const isSignup = mode === 'signup';
+  const isAdminLogin = mode === 'admin';
   const navigate = useNavigate();
   const { isSignedIn } = useUser();
+  const { isAdmin, user } = useAuth();
 
   useEffect(() => {
-    if (isSignedIn) {
+    if (isSignedIn && user) {
       toast.success(isSignup ? 'Signup verified successfully' : 'Login successful');
-      navigate('/dashboard', { replace: true });
+      navigate(isAdminLogin && isAdmin ? '/admin' : '/dashboard', { replace: true });
     }
-  }, [isSignedIn, isSignup, navigate]);
+  }, [isSignedIn, isSignup, isAdminLogin, isAdmin, navigate, user]);
 
   return (
     <main className="auth-shell min-h-[calc(100vh-4rem)]">
@@ -78,12 +81,14 @@ export default function AuthPage({ mode }) {
               <BrandLogo markSize="lg" />
             </Link>
             <div className="mt-auto">
-              <span className="auth-visual-badge">{isSignup ? 'Create secure access' : 'Welcome back'}</span>
+              <span className="auth-visual-badge">{isAdminLogin ? 'Staff entrance' : isSignup ? 'Create secure access' : 'Welcome back'}</span>
               <h1 className="auth-visual-title mt-4">
-                {isSignup ? 'Your health journey starts here.' : 'Your care dashboard awaits.'}
+                {isAdminLogin ? 'Staff control room access.' : isSignup ? 'Your health journey starts here.' : 'Your care dashboard awaits.'}
               </h1>
               <p className="mt-4 max-w-md text-white/80">
-                {isSignup
+                {isAdminLogin
+                  ? 'Review tokens, appointments, doctors, refunds, and hospital operations from a dedicated admin portal.'
+                  : isSignup
                   ? 'Sign up with Google or email, verify securely, and manage hospital visits from one polished dashboard.'
                   : 'Tokens, invoices, appointments, refunds, and AI visit preparation in one secure place.'}
               </p>
@@ -108,8 +113,8 @@ export default function AuthPage({ mode }) {
                   {isSignup ? <UserPlus size={22} /> : <Lock size={22} />}
                 </span>
                 <div>
-                  <h2 className="text-2xl font-bold text-ink">{isSignup ? 'Create account' : 'Sign in'}</h2>
-                  <p className="text-sm text-slate-500">JK Hospital patient portal</p>
+                  <h2 className="text-2xl font-bold text-ink">{isAdminLogin ? 'Admin sign in' : isSignup ? 'Create account' : 'Sign in'}</h2>
+                  <p className="text-sm text-slate-500">{isAdminLogin ? 'JK Hospital staff portal' : 'JK Hospital patient portal'}</p>
                 </div>
               </div>
 
@@ -124,21 +129,29 @@ export default function AuthPage({ mode }) {
                   />
                 ) : (
                   <SignIn
-                    path="/login"
+                    path={isAdminLogin ? '/admin/login' : '/login'}
                     routing="path"
                     signUpUrl="/signup"
-                    fallbackRedirectUrl="/dashboard"
+                    fallbackRedirectUrl={isAdminLogin ? '/admin' : '/dashboard'}
                     appearance={clerkAppearance}
                   />
                 )}
               </div>
 
               <p className="mt-6 text-center text-sm text-slate-600">
-                {isSignup ? 'Already have an account?' : 'New to JK Hospital?'}{' '}
-                <Link className="font-bold text-medical-600 hover:underline" to={isSignup ? '/login' : '/signup'}>
-                  {isSignup ? 'Sign in' : 'Create account'}
+                {isAdminLogin ? 'Patient portal?' : isSignup ? 'Already have an account?' : 'New to JK Hospital?'}{' '}
+                <Link className="font-bold text-medical-600 hover:underline" to={isAdminLogin ? '/login' : isSignup ? '/login' : '/signup'}>
+                  {isAdminLogin ? 'Patient sign in' : isSignup ? 'Sign in' : 'Create account'}
                 </Link>
               </p>
+              {!isSignup && !isAdminLogin && (
+                <p className="mt-3 text-center text-sm text-slate-500">
+                  Staff member?{' '}
+                  <Link className="font-bold text-medical-600 hover:underline" to="/admin/login">
+                    Admin sign in
+                  </Link>
+                </p>
+              )}
             </motion.div>
           </div>
         </section>

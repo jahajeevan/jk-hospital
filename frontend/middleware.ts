@@ -38,6 +38,8 @@ async function hasValidAccess(request: Request) {
 function isExcludedPath(pathname: string) {
   return (
     pathname === '/access' ||
+    pathname === '/admin/login' ||
+    pathname === '/admin' ||
     pathname === '/api/access' ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/_next') ||
