@@ -7,8 +7,7 @@ declare const process: {
 const PUBLIC_FILE = /\.(.*)$/;
 const ACCESS_TOKEN_VERSION = 'v2';
 const COOKIE_NAME = 'site_access';
-const ACCESS_TOKEN_TTL_MS = 60_000;
-const CLEAR_ACCESS_COOKIE = `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`;
+const ACCESS_TOKEN_TTL_MS = 5_000;
 
 function getCookie(request: Request, name: string) {
   const cookieHeader = request.headers.get('cookie') || '';
@@ -62,9 +61,7 @@ export default async function middleware(request: Request) {
   const authenticated = await hasValidAccess(request);
 
   if (pathname === '/access' && authenticated) {
-    const response = Response.redirect(new URL('/', request.url), 302);
-    response.headers.set('Set-Cookie', CLEAR_ACCESS_COOKIE);
-    return response;
+    return Response.redirect(new URL('/', request.url), 302);
   }
 
   if (isExcludedPath(pathname)) {
@@ -75,9 +72,7 @@ export default async function middleware(request: Request) {
     return Response.redirect(new URL('/access', request.url), 302);
   }
 
-  const response = next();
-  response.headers.set('Set-Cookie', CLEAR_ACCESS_COOKIE);
-  return response;
+  return next();
 }
 
 export const config = {

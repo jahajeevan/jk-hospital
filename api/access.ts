@@ -4,7 +4,7 @@ declare const process: {
 
 const ACCESS_TOKEN_VERSION = 'v2';
 const COOKIE_NAME = 'site_access';
-const COOKIE_MAX_AGE = 60;
+const COOKIE_MAX_AGE = 5;
 
 export const config = {
   runtime: 'edge'
