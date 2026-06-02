@@ -13,6 +13,7 @@ import { setVoiceFeedbackEnabled } from './features/payment-verification/utils/v
 
 const voicePref = localStorage.getItem('jk_payment_voice_enabled');
 setVoiceFeedbackEnabled(voicePref === null ? true : voicePref === 'true');
+
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 function MissingClerkKeys() {
@@ -32,12 +33,20 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
       {clerkPublishableKey ? (
-        <ClerkProvider publishableKey={clerkPublishableKey} afterSignOutUrl="/">
+        <ClerkProvider
+          publishableKey={clerkPublishableKey}
+          signInFallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/"
+          afterSignOutUrl="/"
+        >
           <ThemeProvider>
             <BrowserRouter>
               <AuthProvider>
                 <App />
-                <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+                <Toaster
+                  position="top-right"
+                  toastOptions={{ duration: 3500 }}
+                />
               </AuthProvider>
             </BrowserRouter>
           </ThemeProvider>
