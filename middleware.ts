@@ -6,7 +6,17 @@ declare const process: {
 
 const PUBLIC_FILE = /\.(.*)$/;
 const ACCESS_TOKEN_VERSION = 'v2';
-const ACCESS_TOKEN_TTL_MS = 10_000;
+const COOKIE_NAME = 'site_access';
+const ACCESS_TOKEN_TTL_MS = 60_000;
+const CLEAR_ACCESS_COOKIE = `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`;
+
+function getCookie(request: Request, name: string) {
+  const cookieHeader = request.headers.get('cookie') || '';
+  const cookies = cookieHeader.split(';').map((cookie) => cookie.trim());
+  const match = cookies.find((cookie) => cookie.startsWith(`${name}=`));
+
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
+}
 
 async function createAccessToken(password: string, timestamp: number) {
   const encoder = new TextEncoder();
@@ -23,8 +33,7 @@ async function hasValidAccess(request: Request) {
 
   if (!sitePassword) return false;
 
-  const url = new URL(request.url);
-  const accessToken = url.searchParams.get('access') || '';
+  const accessToken = getCookie(request, COOKIE_NAME);
   const [timestampValue, signature] = accessToken.split('.');
   const timestamp = Number(timestampValue);
 
@@ -53,7 +62,9 @@ export default async function middleware(request: Request) {
   const authenticated = await hasValidAccess(request);
 
   if (pathname === '/access' && authenticated) {
-    return Response.redirect(new URL('/', request.url), 302);
+    const response = Response.redirect(new URL('/', request.url), 302);
+    response.headers.set('Set-Cookie', CLEAR_ACCESS_COOKIE);
+    return response;
   }
 
   if (isExcludedPath(pathname)) {
@@ -64,7 +75,9 @@ export default async function middleware(request: Request) {
     return Response.redirect(new URL('/access', request.url), 302);
   }
 
-  return next();
+  const response = next();
+  response.headers.set('Set-Cookie', CLEAR_ACCESS_COOKIE);
+  return response;
 }
 
 export const config = {

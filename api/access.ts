@@ -3,7 +3,8 @@ declare const process: {
 };
 
 const ACCESS_TOKEN_VERSION = 'v2';
-const ACCESS_TOKEN_TTL_MS = 10_000;
+const COOKIE_NAME = 'site_access';
+const COOKIE_MAX_AGE = 60;
 
 export const config = {
   runtime: 'edge'
@@ -18,6 +19,12 @@ async function createAccessToken(password: string, timestamp: number) {
     .join('');
 
   return `${timestamp}.${signature}`;
+}
+
+function serializeAccessCookie(value: string) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+
+  return `${COOKIE_NAME}=${value}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax${secure}`;
 }
 
 export default async function handler(request: Request) {
@@ -42,10 +49,11 @@ export default async function handler(request: Request) {
     const accessToken = await createAccessToken(sitePassword, Date.now());
 
     return Response.json(
+      { success: true, redirectTo: '/' },
       {
-        success: true,
-        redirectTo: `/?access=${encodeURIComponent(accessToken)}`,
-        expiresInMs: ACCESS_TOKEN_TTL_MS
+        headers: {
+          'Set-Cookie': serializeAccessCookie(accessToken)
+        }
       }
     );
   } catch {
