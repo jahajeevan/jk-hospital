@@ -278,7 +278,7 @@ export default function SmartAiPage() {
                 }}
                 placeholder={active.placeholder}
               />
-              <button type="button" onClick={send} disabled={loading} className="ai-send-button">
+              <button type="button" onClick={() => send()} disabled={loading} className="ai-send-button">
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 Send
               </button>
