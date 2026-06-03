@@ -43,13 +43,13 @@ const tools = [
 const quickActions = [
   { tool: 'triage', label: 'Emergency triage', prompt: 'I have chest pain and shortness of breath. What should I do right now?' },
   { tool: 'symptom', label: 'Route department', prompt: 'I have fever, cough, and body pain for three days.' },
-  { tool: 'faq', label: 'Hospital command', prompt: 'What is the ambulance or emergency contact for JK Hospital?' },
-  { tool: 'report', label: 'Decode report', prompt: 'Hemoglobin 10.2 g/dL, WBC 8200, Platelets 2.5 lakh. Please explain in simple words.' }
+  { tool: 'faq', label: 'Hospital help desk', prompt: 'What is the ambulance or emergency contact for JK Hospital?' },
+  { tool: 'report', label: 'Explain report', prompt: 'Hemoglobin 10.2 g/dL, WBC 8200, Platelets 2.5 lakh. Please explain in simple words.' }
 ];
 
 const initialAssistantMessage = {
   role: 'assistant',
-  text: `Hello, I am JK Hospital's local AI assistant powered by Qwen3 8B on Ollama. I can help with department suggestions, visit prep, reports, prescriptions, FAQs, and emergency guidance.\n\n${disclaimer}`
+  text: `Hello, I am JK Hospital's local AI assistant powered by Gemma3:4B on Ollama. I can help with department suggestions, visit prep, reports, prescriptions, FAQs, and emergency guidance.\n\n${disclaimer}`
 };
 
 const endpointByTool = {
@@ -86,9 +86,9 @@ const responseText = (tool, payload) => {
 
 const offlineResponse = (tool) => {
   if (tool === 'faq') {
-    return `Local AI is unavailable right now, but the hospital platform is still online.\n\nFor emergencies, contact JK Hospital at 7845265507. For timings, insurance, admissions, and department availability, please confirm with the hospital desk.\n\nTo restore AI answers, start Ollama and make sure qwen3:4b is available on port 11434.\n\n${disclaimer}`;
+    return `Local AI is unavailable right now, but the hospital platform is still online.\n\nFor emergencies, contact JK Hospital at 7845265507. For timings, insurance, admissions, and department availability, please confirm with the hospital desk.\n\nTo restore AI answers, start Ollama and make sure gemma3:4b is available on port 11434.\n\n${disclaimer}`;
   }
-  return `Local AI is unavailable right now. Please start Ollama and make sure qwen3:4b is running on http://127.0.0.1:11434.\n\nTry:\n\nollama serve\nollama pull qwen3:4b\n\n${disclaimer}`;
+  return `Local AI is unavailable right now. Please start Ollama and make sure gemma3:4b is running on http://127.0.0.1:11434.\n\nTry:\n\nollama serve\nollama pull gemma3:4b\n\n${disclaimer}`;
 };
 
 export default function SmartAiPage() {
@@ -157,16 +157,16 @@ export default function SmartAiPage() {
   };
 
   return (
-    <main className="ai-lab-page min-h-[calc(100vh-4rem)] py-6 md:py-8">
+    <main className="ai-lab-page min-h-[calc(100vh-4rem)] py-8 md:py-10">
       <div className="ai-lab-grid" aria-hidden="true" />
       <div className="container-pad relative z-10">
         <section className="ai-lab-hero ai-care-hero">
           <div>
-            <span className="ai-lab-badge"><Sparkles size={14} /> Local Qwen3:8B care intelligence</span>
-            <h1>The hospital AI that listens like a care desk.</h1>
+            <span className="ai-lab-badge"><Sparkles size={14} /> Local Gemma3:4B assistant</span>
+            <h1>Ask JK Hospital before your visit.</h1>
             <p>
-              A private assistant for nervous patients and busy staff: triage guidance, department routing,
-              report explanations, prescription help, doctor-note formatting, and hospital FAQs in one calm cockpit.
+              Get calm guidance for department routing, visit preparation, reports, prescriptions,
+              FAQs, and urgent symptom next steps. For emergencies, call 7845265507 immediately.
             </p>
             <div className="ai-lab-quick">
               {quickActions.map((action) => (
@@ -181,11 +181,11 @@ export default function SmartAiPage() {
             <dl>
               <div>
                 <dt>Provider</dt>
-                <dd>{activeProvider?.name || 'ollama'}</dd>
+                <dd>{activeProvider?.name || 'Ollama'}</dd>
               </div>
               <div>
                 <dt>Model</dt>
-                <dd>{activeProvider?.model || 'qwen3:4b'}</dd>
+                <dd>{activeProvider?.model || 'gemma3:4b'}</dd>
               </div>
               <div>
                 <dt>Status</dt>
@@ -216,8 +216,8 @@ export default function SmartAiPage() {
             </div>
             <div className="ai-rail-card">
               <ShieldCheck size={18} />
-              <p>Guardrails active</p>
-              <span>Medical safety disclaimer attached to every answer.</span>
+              <p>Safety first</p>
+              <span>Every answer keeps medical limits clear and points emergencies to direct care.</span>
             </div>
           </aside>
 
@@ -227,11 +227,11 @@ export default function SmartAiPage() {
                 <span className="ai-console-icon"><HeartPulse size={20} /></span>
                 <div className="min-w-0">
                   <p>{active.label} care mode</p>
-                  <span>Qwen3:8B local reasoning with hospital safety rails</span>
+                  <span>Gemma3:4B local AI with hospital safety checks</span>
                 </div>
               </div>
               <div className="ai-console-actions">
-                <span><Gauge size={14} /> Secure local mode</span>
+                <span><Gauge size={14} /> Local AI</span>
                 <button type="button" title="Voice input ready for browser speech APIs">
                   <Mic size={16} />
                 </button>
@@ -260,7 +260,7 @@ export default function SmartAiPage() {
               {loading ? (
                 <div className="ai-thinking">
                   <Loader2 size={16} className="animate-spin" />
-                  Qwen3:8B is reasoning...
+                  Gemma3:4B is reasoning...
                 </div>
               ) : null}
             </div>

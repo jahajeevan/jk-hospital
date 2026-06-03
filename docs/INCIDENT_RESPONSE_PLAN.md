@@ -58,7 +58,7 @@ curl https://hospital.example.com/api/health
 curl https://hospital.example.com/api/v1/health/live
 curl http://127.0.0.1:11434/api/generate \
   -H "Content-Type: application/json" \
-  -d '{"model":"qwen3:4b","prompt":"Reply OK only","stream":false}'
+  -d '{"model":"gemma3:4b","prompt":"Reply OK only","stream":false}'
 pm2 status
 pm2 logs
 df -h

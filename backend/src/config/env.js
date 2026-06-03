@@ -47,7 +47,7 @@ export const env = {
   redisUrl: process.env.REDIS_URL,
   sentryDsn: process.env.SENTRY_DSN,
   aiProvider: process.env.AI_PROVIDER || 'ollama',
-  ollamaModel: process.env.OLLAMA_MODEL || 'qwen3:4b',
+  ollamaModel: process.env.OLLAMA_MODEL || 'gemma3:4b',
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
   ollamaTimeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS || 25000),
   ollamaRetries: Number(process.env.OLLAMA_RETRIES || 1),

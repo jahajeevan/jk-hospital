@@ -11,7 +11,7 @@
 - [ ] Configure exact `CORS_ORIGINS`.
 - [ ] Configure `CLIENT_URL` with HTTPS domain.
 - [ ] Set `NODE_ENV=production`.
-- [ ] Confirm Ollama `qwen3:4b` is installed on the AI host.
+- [ ] Confirm Ollama `gemma3:4b` is installed on the AI host.
 - [ ] Keep `OLLAMA_BASE_URL` private, preferably `http://127.0.0.1:11434` or private network.
 
 ## Security

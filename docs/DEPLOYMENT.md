@@ -11,7 +11,7 @@
 - `CORS_ORIGINS`
 - Payment keys for Stripe and Razorpay when payment gateways are enabled
 - `REDIS_URL` for queues, Socket.io adapter, reminders, and caching
-- `OLLAMA_MODEL=qwen3:4b` when using the local AI provider
+- `OLLAMA_MODEL=gemma3:4b` when using the local AI provider
 
 ## Local Production Smoke Test
 

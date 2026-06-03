@@ -5,7 +5,7 @@
 Backend AI defaults to local Ollama:
 
 ```bash
-ollama pull qwen3:4b
+ollama pull gemma3:4b
 ollama serve
 npm run dev
 ```
@@ -14,7 +14,7 @@ Required backend environment:
 
 ```env
 AI_PROVIDER=ollama
-OLLAMA_MODEL=qwen3:4b
+OLLAMA_MODEL=gemma3:4b
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_TIMEOUT_MS=25000
 OLLAMA_RETRIES=1

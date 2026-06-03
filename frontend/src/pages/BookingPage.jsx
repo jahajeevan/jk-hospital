@@ -148,7 +148,7 @@ export default function BookingPage() {
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-medical-600 text-white"><Bot size={20} /></span>
               <div>
                 <p className="flex items-center gap-2 font-bold text-ink"><Sparkles size={16} className="text-medical-600" /> AI appointment assistant</p>
-                <p className="text-sm text-slate-500">Describe the appointment and Qwen3 will prefill what it can.</p>
+                <p className="text-sm text-slate-500">Describe the appointment and Gemma3 will prefill what it can.</p>
               </div>
             </div>
             <input
