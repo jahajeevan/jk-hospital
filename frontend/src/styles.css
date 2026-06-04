@@ -2845,17 +2845,17 @@ body::before {
   }
 
   .liquid-nav {
-    min-height: 3.5rem;
+    min-height: 3.15rem;
   }
 
   .liquid-nav .container-pad {
-    height: 3.5rem;
-    min-height: 3.5rem;
+    height: 3.15rem;
+    min-height: 3.15rem;
     gap: 0.5rem;
   }
 
   .navbar-brand .brand-wordmark {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
   }
 
   .brand-mark {
@@ -2863,8 +2863,8 @@ body::before {
   }
 
   .liquid-nav .brand-mark {
-    width: 2.35rem !important;
-    height: 2.35rem !important;
+    width: 2rem !important;
+    height: 2rem !important;
   }
 
   .brand-mark-shield {
@@ -2873,10 +2873,10 @@ body::before {
 
   .liquid-nav button[aria-label="Menu"] {
     display: grid;
-    height: 2.6rem;
-    width: 2.6rem;
+    height: 2.25rem;
+    width: 2.25rem;
     place-items: center;
-    border-radius: 0.8rem;
+    border-radius: 0.7rem;
     padding: 0;
   }
 
@@ -2887,14 +2887,14 @@ body::before {
   .landing-hero-shell {
     min-height: auto !important;
     align-items: start;
-    padding-top: 1.35rem;
-    padding-bottom: 1.25rem;
+    padding-top: 0.85rem;
+    padding-bottom: 0.95rem;
   }
 
   .landing-display {
-    margin-top: 1rem;
-    font-size: clamp(1.95rem, 9.2vw, 2.45rem);
-    line-height: 1.04;
+    margin-top: 0.8rem;
+    font-size: clamp(1.55rem, 7.4vw, 1.95rem);
+    line-height: 1.08;
   }
 
   .hero-copy {
@@ -2902,25 +2902,25 @@ body::before {
   }
 
   .hero-copy p {
-    margin-top: 1rem;
-    font-size: 0.92rem;
-    line-height: 1.52;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    line-height: 1.42;
   }
 
   .hero-actions {
-    margin-top: 1rem;
-    gap: 0.55rem;
+    margin-top: 0.8rem;
+    gap: 0.45rem;
   }
 
   .hero-actions > * {
     width: 100%;
-    min-height: 2.75rem;
-    border-radius: 0.95rem !important;
-    padding-block: 0.68rem;
-    font-size: 0.9rem;
+    min-height: 2.35rem;
+    border-radius: 0.75rem !important;
+    padding-block: 0.5rem;
+    font-size: 0.8rem;
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.92),
-      0 8px 18px rgba(15,23,42,0.13) !important;
+      0 6px 14px rgba(15,23,42,0.11) !important;
   }
 
   .hero-actions > :nth-child(n + 3) {
@@ -2930,8 +2930,8 @@ body::before {
   .hero-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.6rem;
-    margin-top: 1rem;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
   }
 
   .hero-stats > div {
@@ -2940,12 +2940,12 @@ body::before {
   }
 
   .hero-stats p:first-child {
-    font-size: 1.08rem;
+    font-size: 0.9rem;
     line-height: 1.1;
   }
 
   .hero-stats p:last-child {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     line-height: 1.25;
   }
 
@@ -2955,10 +2955,10 @@ body::before {
 
   .landing-pill {
     width: 100%;
-    border-radius: 0.95rem;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.7rem;
-    line-height: 1.38;
+    border-radius: 0.75rem;
+    padding: 0.48rem 0.6rem;
+    font-size: 0.63rem;
+    line-height: 1.3;
     white-space: normal;
   }
 
@@ -3153,41 +3153,41 @@ body::before {
 
   .auth-form-panel {
     align-items: start;
-    padding: 0.9rem 0.9rem 1.35rem;
+    padding: 0.65rem 0.75rem 1rem;
   }
 
   .auth-form-inner {
     max-width: 100%;
-    border-radius: 1rem;
-    padding: 0.9rem;
+    border-radius: 0.8rem;
+    padding: 0.7rem;
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.95),
-      0 14px 34px rgba(8,47,73,0.09);
+      0 10px 24px rgba(8,47,73,0.08);
   }
 
   .auth-form-header {
     align-items: center;
-    gap: 0.75rem;
-    padding-bottom: 0.85rem;
+    gap: 0.6rem;
+    padding-bottom: 0.65rem;
   }
 
   .auth-form-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 0.85rem;
+    width: 2.45rem;
+    height: 2.45rem;
+    border-radius: 0.7rem;
   }
 
   .auth-form-inner h2 {
-    font-size: clamp(1.55rem, 7.5vw, 1.95rem);
+    font-size: clamp(1.35rem, 6.4vw, 1.65rem);
     line-height: 1.05;
   }
 
   .auth-form-inner .cl-socialButtonsBlockButton,
   .auth-form-inner .cl-formFieldInput,
   .auth-form-inner .cl-formButtonPrimary {
-    min-height: 2.85rem !important;
-    border-radius: 0.85rem !important;
-    font-size: 0.86rem !important;
+    min-height: 2.45rem !important;
+    border-radius: 0.7rem !important;
+    font-size: 0.78rem !important;
   }
 
   .auth-form-inner .cl-formFieldLabel {
@@ -3195,7 +3195,7 @@ body::before {
   }
 
   .auth-form-inner .cl-dividerRow {
-    margin: 0.95rem 0 !important;
+    margin: 0.65rem 0 !important;
   }
 
   .auth-form-inner .cl-formFieldRow {
@@ -3205,7 +3205,7 @@ body::before {
   .auth-form-inner .cl-footerActionText,
   .auth-form-inner .cl-footerActionLink,
   .auth-form-inner p {
-    font-size: 0.86rem;
+    font-size: 0.78rem;
   }
 }
 
@@ -3295,7 +3295,7 @@ body::before {
   }
 
   .landing-display {
-    font-size: clamp(2rem, 10vw, 2.55rem);
+    font-size: clamp(1.45rem, 7.1vw, 1.85rem);
   }
 
   .container-pad {
