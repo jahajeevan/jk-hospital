@@ -2834,29 +2834,50 @@ body::before {
     overflow-x: clip;
   }
 
+  body {
+    background:
+      linear-gradient(145deg, rgba(255,255,255,0.98), rgba(241,248,253,0.96) 48%, rgba(238,253,247,0.9)),
+      #f4f8fb;
+  }
+
   .nav-auth-link {
     display: none !important;
   }
 
   .liquid-nav {
-    min-height: 4rem;
+    min-height: 3.5rem;
   }
 
   .liquid-nav .container-pad {
-    height: 4rem;
-    min-height: 4rem;
+    height: 3.5rem;
+    min-height: 3.5rem;
+    gap: 0.5rem;
   }
 
   .navbar-brand .brand-wordmark {
-    font-size: 0.86rem;
+    font-size: 0.8rem;
   }
 
   .brand-mark {
     filter: none;
   }
 
+  .liquid-nav .brand-mark {
+    width: 2.35rem !important;
+    height: 2.35rem !important;
+  }
+
   .brand-mark-shield {
-    min-width: 2.5rem;
+    min-width: 0;
+  }
+
+  .liquid-nav button[aria-label="Menu"] {
+    display: grid;
+    height: 2.6rem;
+    width: 2.6rem;
+    place-items: center;
+    border-radius: 0.8rem;
+    padding: 0;
   }
 
   .landing-hero {
@@ -2866,13 +2887,14 @@ body::before {
   .landing-hero-shell {
     min-height: auto !important;
     align-items: start;
-    padding-top: 2.4rem;
-    padding-bottom: 2rem;
+    padding-top: 1.35rem;
+    padding-bottom: 1.25rem;
   }
 
   .landing-display {
-    font-size: clamp(2.25rem, 11vw, 3rem);
-    line-height: 1.02;
+    margin-top: 1rem;
+    font-size: clamp(1.95rem, 9.2vw, 2.45rem);
+    line-height: 1.04;
   }
 
   .hero-copy {
@@ -2880,27 +2902,36 @@ body::before {
   }
 
   .hero-copy p {
-    font-size: 1rem;
-    line-height: 1.65;
+    margin-top: 1rem;
+    font-size: 0.92rem;
+    line-height: 1.52;
   }
 
   .hero-actions {
-    margin-top: 1.25rem;
-    gap: 0.7rem;
+    margin-top: 1rem;
+    gap: 0.55rem;
   }
 
   .hero-actions > * {
     width: 100%;
-    min-height: 3.25rem;
-    padding-block: 0.85rem;
-    font-size: 0.98rem;
+    min-height: 2.75rem;
+    border-radius: 0.95rem !important;
+    padding-block: 0.68rem;
+    font-size: 0.9rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.92),
+      0 8px 18px rgba(15,23,42,0.13) !important;
+  }
+
+  .hero-actions > :nth-child(n + 3) {
+    display: none;
   }
 
   .hero-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.85rem;
-    margin-top: 1.35rem;
+    gap: 0.6rem;
+    margin-top: 1rem;
   }
 
   .hero-stats > div {
@@ -2909,25 +2940,25 @@ body::before {
   }
 
   .hero-stats p:first-child {
-    font-size: 1.35rem;
+    font-size: 1.08rem;
     line-height: 1.1;
   }
 
   .hero-stats p:last-child {
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     line-height: 1.25;
   }
 
   .hero-chips {
-    justify-content: center;
-    margin-top: 1.6rem;
+    display: none;
   }
 
   .landing-pill {
     width: 100%;
-    padding: 0.75rem 0.95rem;
-    font-size: 0.78rem;
-    line-height: 1.45;
+    border-radius: 0.95rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.7rem;
+    line-height: 1.38;
     white-space: normal;
   }
 
@@ -2947,25 +2978,27 @@ body::before {
   .booking-hero-panel {
     align-items: stretch;
     flex-direction: column;
-    border-radius: 1.15rem;
-    padding: 1.05rem;
+    border-radius: 0.95rem;
+    padding: 0.9rem;
+    gap: 0.85rem;
   }
 
   .booking-hero-panel h1,
   .doctors-hero h1 {
-    font-size: clamp(2rem, 10vw, 3rem);
-    line-height: 1.04;
+    font-size: clamp(1.75rem, 8vw, 2.35rem);
+    line-height: 1.06;
   }
 
   .booking-hero-panel p,
   .doctors-hero p {
-    font-size: 0.96rem;
-    line-height: 1.58;
+    font-size: 0.9rem;
+    line-height: 1.48;
   }
 
   .booking-rule-card {
     min-width: 0;
-    padding: 0.9rem;
+    padding: 0.75rem;
+    border-radius: 0.85rem;
   }
 
   .booking-ai-strip,
@@ -2974,8 +3007,8 @@ body::before {
   .booking-summary-sticky,
   .patient-panel,
   .patient-empty-card {
-    border-radius: 1.05rem;
-    padding: 1rem;
+    border-radius: 0.95rem;
+    padding: 0.85rem;
   }
 
   .booking-experience-page,
@@ -2985,7 +3018,7 @@ body::before {
   }
 
   .booking-experience-page {
-    padding-top: 1.25rem;
+    padding-top: 1rem;
     padding-bottom: 2.5rem;
   }
 
@@ -2999,7 +3032,8 @@ body::before {
 
   .booking-select-card,
   .booking-slot-card {
-    padding: 0.9rem;
+    padding: 0.75rem;
+    border-radius: 0.85rem;
   }
 
   .booking-summary-sticky {
@@ -3016,6 +3050,9 @@ body::before {
   .booking-main-card .btn-primary,
   .booking-main-card .btn-secondary {
     width: 100%;
+    min-height: 2.75rem;
+    border-radius: 0.85rem;
+    padding: 0.7rem 0.9rem;
   }
 
   .patient-panel,
@@ -3048,7 +3085,8 @@ body::before {
     display: grid;
     grid-template-columns: 1fr;
     justify-items: start;
-    gap: 0.8rem;
+    gap: 0.55rem;
+    font-size: 0.78rem;
   }
 
   .video-strip-track {
@@ -3062,18 +3100,18 @@ body::before {
   }
 
   .section-pro {
-    padding-top: 3.2rem;
-    padding-bottom: 3.2rem;
+    padding-top: 2.25rem;
+    padding-bottom: 2.25rem;
   }
 
   .section-title-pro,
   .cinematic-hero h1 {
-    font-size: clamp(1.85rem, 9vw, 2.6rem) !important;
+    font-size: clamp(1.55rem, 7.6vw, 2.1rem) !important;
   }
 
   .cinematic-hero .container-pad {
-    padding-top: 4rem;
-    padding-bottom: 3rem;
+    padding-top: 3rem;
+    padding-bottom: 2.25rem;
   }
 
   .landing-cta {
@@ -3095,8 +3133,8 @@ body::before {
   }
 
   .site-footer {
-    padding-top: 2.6rem;
-    padding-bottom: 2.6rem;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
   }
 
   .site-footer .brand-lockup {
@@ -3114,28 +3152,60 @@ body::before {
   }
 
   .auth-form-panel {
-    padding: 1.35rem 1rem 2rem;
+    align-items: start;
+    padding: 0.9rem 0.9rem 1.35rem;
   }
 
   .auth-form-inner {
-    border-radius: 1.35rem;
-    padding: 1.1rem;
+    max-width: 100%;
+    border-radius: 1rem;
+    padding: 0.9rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      0 14px 34px rgba(8,47,73,0.09);
   }
 
   .auth-form-header {
     align-items: center;
-    gap: 0.9rem;
-    padding-bottom: 1rem;
+    gap: 0.75rem;
+    padding-bottom: 0.85rem;
   }
 
   .auth-form-icon {
-    width: 3.75rem;
-    height: 3.75rem;
-    border-radius: 1.1rem;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.85rem;
   }
 
   .auth-form-inner h2 {
-    font-size: clamp(1.85rem, 9vw, 2.5rem);
+    font-size: clamp(1.55rem, 7.5vw, 1.95rem);
+    line-height: 1.05;
+  }
+
+  .auth-form-inner .cl-socialButtonsBlockButton,
+  .auth-form-inner .cl-formFieldInput,
+  .auth-form-inner .cl-formButtonPrimary {
+    min-height: 2.85rem !important;
+    border-radius: 0.85rem !important;
+    font-size: 0.86rem !important;
+  }
+
+  .auth-form-inner .cl-formFieldLabel {
+    font-size: 0.68rem !important;
+  }
+
+  .auth-form-inner .cl-dividerRow {
+    margin: 0.95rem 0 !important;
+  }
+
+  .auth-form-inner .cl-formFieldRow {
+    gap: 0.7rem;
+  }
+
+  .auth-form-inner .cl-footerActionText,
+  .auth-form-inner .cl-footerActionLink,
+  .auth-form-inner p {
+    font-size: 0.86rem;
   }
 }
 
