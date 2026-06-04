@@ -2830,16 +2830,33 @@ body::before {
 }
 
 @media (max-width: 767px) {
+  .page-route-shell {
+    overflow-x: clip;
+  }
+
   .nav-auth-link {
     display: none !important;
   }
 
+  .liquid-nav {
+    min-height: 4rem;
+  }
+
   .liquid-nav .container-pad {
-    height: 4.25rem;
+    height: 4rem;
+    min-height: 4rem;
   }
 
   .navbar-brand .brand-wordmark {
     font-size: 0.86rem;
+  }
+
+  .brand-mark {
+    filter: none;
+  }
+
+  .brand-mark-shield {
+    min-width: 2.5rem;
   }
 
   .landing-hero {
@@ -2849,27 +2866,34 @@ body::before {
   .landing-hero-shell {
     min-height: auto !important;
     align-items: start;
-    padding-top: 3rem;
-    padding-bottom: 2.25rem;
+    padding-top: 2.4rem;
+    padding-bottom: 2rem;
   }
 
   .landing-display {
-    font-size: clamp(2.35rem, 12vw, 3.25rem);
-    line-height: 1.04;
+    font-size: clamp(2.25rem, 11vw, 3rem);
+    line-height: 1.02;
   }
 
   .hero-copy {
     max-width: 100%;
   }
 
+  .hero-copy p {
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
   .hero-actions {
-    margin-top: 1.45rem;
-    gap: 0.65rem;
+    margin-top: 1.25rem;
+    gap: 0.7rem;
   }
 
   .hero-actions > * {
     width: 100%;
-    min-height: 2.9rem;
+    min-height: 3.25rem;
+    padding-block: 0.85rem;
+    font-size: 0.98rem;
   }
 
   .hero-stats {
@@ -2901,6 +2925,9 @@ body::before {
 
   .landing-pill {
     width: 100%;
+    padding: 0.75rem 0.95rem;
+    font-size: 0.78rem;
+    line-height: 1.45;
     white-space: normal;
   }
 
@@ -2920,6 +2947,59 @@ body::before {
   .booking-hero-panel {
     align-items: stretch;
     flex-direction: column;
+    border-radius: 1.15rem;
+    padding: 1.05rem;
+  }
+
+  .booking-hero-panel h1,
+  .doctors-hero h1 {
+    font-size: clamp(2rem, 10vw, 3rem);
+    line-height: 1.04;
+  }
+
+  .booking-hero-panel p,
+  .doctors-hero p {
+    font-size: 0.96rem;
+    line-height: 1.58;
+  }
+
+  .booking-rule-card {
+    min-width: 0;
+    padding: 0.9rem;
+  }
+
+  .booking-ai-strip,
+  .booking-stepper-wrap,
+  .booking-main-card,
+  .booking-summary-sticky,
+  .patient-panel,
+  .patient-empty-card {
+    border-radius: 1.05rem;
+    padding: 1rem;
+  }
+
+  .booking-experience-page,
+  .patient-wow-page,
+  .profile-completion-page {
+    overflow-x: clip;
+  }
+
+  .booking-experience-page {
+    padding-top: 1.25rem;
+    padding-bottom: 2.5rem;
+  }
+
+  .booking-experience-page .mt-8 {
+    margin-top: 1rem;
+  }
+
+  .booking-stepper-wrap ol {
+    gap: 0.55rem;
+  }
+
+  .booking-select-card,
+  .booking-slot-card {
+    padding: 0.9rem;
   }
 
   .booking-summary-sticky {
@@ -2982,18 +3062,80 @@ body::before {
   }
 
   .section-pro {
-    padding-top: 4.5rem;
-    padding-bottom: 4.5rem;
+    padding-top: 3.2rem;
+    padding-bottom: 3.2rem;
   }
 
   .section-title-pro,
   .cinematic-hero h1 {
-    font-size: clamp(2rem, 10vw, 3rem) !important;
+    font-size: clamp(1.85rem, 9vw, 2.6rem) !important;
   }
 
   .cinematic-hero .container-pad {
-    padding-top: 5.25rem;
-    padding-bottom: 4.25rem;
+    padding-top: 4rem;
+    padding-bottom: 3rem;
+  }
+
+  .landing-cta {
+    border-radius: 1.25rem;
+    padding: 2rem 1.25rem;
+  }
+
+  .landing-cta h2 {
+    font-size: clamp(1.8rem, 9vw, 2.35rem);
+    line-height: 1.08;
+  }
+
+  .btn-cta-white,
+  .btn-cta-outline {
+    width: 100%;
+    min-height: 3.2rem;
+    padding: 0.9rem 1rem;
+    font-size: 0.95rem;
+  }
+
+  .site-footer {
+    padding-top: 2.6rem;
+    padding-bottom: 2.6rem;
+  }
+
+  .site-footer .brand-lockup {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .site-footer .brand-wordmark {
+    font-size: 1rem;
+  }
+
+  .footer-contact-row {
+    align-items: flex-start;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-form-panel {
+    padding: 1.35rem 1rem 2rem;
+  }
+
+  .auth-form-inner {
+    border-radius: 1.35rem;
+    padding: 1.1rem;
+  }
+
+  .auth-form-header {
+    align-items: center;
+    gap: 0.9rem;
+    padding-bottom: 1rem;
+  }
+
+  .auth-form-icon {
+    width: 3.75rem;
+    height: 3.75rem;
+    border-radius: 1.1rem;
+  }
+
+  .auth-form-inner h2 {
+    font-size: clamp(1.85rem, 9vw, 2.5rem);
   }
 }
 
@@ -3083,7 +3225,22 @@ body::before {
   }
 
   .landing-display {
-    font-size: clamp(2.1rem, 11vw, 2.8rem);
+    font-size: clamp(2rem, 10vw, 2.55rem);
+  }
+
+  .container-pad {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
+
+  .booking-main-card h2,
+  .patient-panel h2 {
+    font-size: 1.28rem;
+    line-height: 1.25;
+  }
+
+  .patient-hero-panel h1 {
+    font-size: clamp(2.25rem, 12vw, 3rem);
   }
 
 }

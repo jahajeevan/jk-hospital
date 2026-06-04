@@ -19,6 +19,16 @@ const today = localIsoDate();
 const STEPS = ['Doctor', 'Date & slot', 'Patient', 'Review'];
 const slotBlockedMessage = (reason) =>
   `${reason || 'Selected slot is not bookable now'}. Please choose another slot, another date, or book for the next day.`;
+const failValidation = (message) => {
+  toast.error(message);
+  return false;
+};
+const stepIndex = {
+  doctor: 0,
+  slot: 1,
+  patient: 2,
+  review: 3
+};
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -28,7 +38,7 @@ export default function BookingPage() {
   const [doctors, setDoctors] = useState(() => getLocalDoctors());
   const [doctorId, setDoctorId] = useState(() => state?.doctorId || getLocalDoctors()[0]?._id);
   const [date, setDate] = useState(today);
-  const [slotId, setSlotId] = useState(() => getLocalDoctors()[0]?.slots[0]?._id);
+  const [slotId, setSlotId] = useState('');
   const [patient, setPatient] = useState({ name: user?.name || '', age: '', gender: '', phone: '', symptoms: '' });
   const [aiRequest, setAiRequest] = useState('');
   const [aiBookingLoading, setAiBookingLoading] = useState(false);
@@ -46,7 +56,7 @@ export default function BookingPage() {
 
   const doctor = doctors.find((item) => item._id === doctorId) || doctors[0];
   const slots = (doctor?.slots || []).filter((item) => item.isActive !== false && (!item.date || item.date === date));
-  const slot = slots.find((item) => item._id === slotId) || slots[0];
+  const slot = slots.find((item) => item._id === slotId);
   const availability = useMemo(() => getSlotAvailability(doctor, slot?._id, date), [doctor, slot?._id, date]);
   const boundedSlotDates = (doctor?.slots || []).filter((item) => item.isActive !== false && item.availableUntil);
   const maxBookingDate = boundedSlotDates.length && boundedSlotDates.length === (doctor?.slots || []).filter((item) => item.isActive !== false).length
@@ -54,31 +64,41 @@ export default function BookingPage() {
     : undefined;
   const consultationFee = normalizeFee(slot?.fee, doctor?.fee);
   const showPrice = step >= 1 && Boolean(slot?._id);
-  const paymentBlocked = !availability.isBookable || availability.isFull;
-  const paymentBlockedReason = availability.reasons?.[0] || (availability.isFull ? 'Selected slot is full' : 'Selected slot is not bookable now');
+  const paymentBlocked = !slot || !availability.isBookable || availability.isFull;
+  const paymentBlockedReason = !slot ? 'Select an available OP slot' : availability.reasons?.[0] || (availability.isFull ? 'Selected slot is full' : 'Selected slot is not bookable now');
 
   useEffect(() => {
-    if (slots.length && !slots.some((item) => item._id === slotId)) setSlotId(slots[0]._id);
+    if (slotId && !slots.some((item) => item._id === slotId)) setSlotId('');
   }, [slotId, slots]);
 
-  const validateStep = () => {
-    if (step === 0) {
-      if (!doctor) return toast.error('Select a doctor');
-      if (doctor.isAvailable === false) return toast.error('Selected doctor is currently on leave');
+  const validateStep = (targetStep = step) => {
+    if (targetStep === stepIndex.doctor) {
+      if (!doctor) return failValidation('Select a doctor');
+      if (doctor.isAvailable === false) return failValidation('Selected doctor is currently on leave');
     }
-    if (step === 1) {
-      if (!date) return toast.error('Select appointment date');
-      if (new Date(date) < new Date(today)) return toast.error('Appointment date cannot be in the past');
-      if (!slot) return toast.error('Select a valid slot');
-      if (!slots.length) return toast.error('No slots for this date');
-      if (paymentBlocked) return toast.error(slotBlockedMessage(paymentBlockedReason));
+    if (targetStep === stepIndex.slot) {
+      if (!date) return failValidation('Select appointment date');
+      if (new Date(date) < new Date(today)) return failValidation('Appointment date cannot be in the past');
+      if (!slots.length) return failValidation('No slots for this date');
+      if (!slot) return failValidation('Select an available OP slot before continuing');
+      if (paymentBlocked) return failValidation(slotBlockedMessage(paymentBlockedReason));
     }
-    if (step === 2) {
-      if (!patient.name?.trim()) return toast.error('Enter patient name');
-      if (!patient.age || Number(patient.age) < 1 || Number(patient.age) > 120) return toast.error('Enter a valid age from 1 to 120');
-      if (!patient.gender) return toast.error('Select gender');
-      if (!isValidIndianMobile(patient.phone)) return toast.error('Enter valid 10-digit Indian mobile number');
-      if (patient.symptoms.trim().length < 3) return toast.error('Describe symptoms or reason for visit');
+    if (targetStep === stepIndex.patient) {
+      if (!patient.name?.trim()) return failValidation('Enter patient name');
+      if (!patient.age || Number(patient.age) < 1 || Number(patient.age) > 120) return failValidation('Enter a valid age from 1 to 120');
+      if (!patient.gender) return failValidation('Select gender');
+      if (!isValidIndianMobile(patient.phone)) return failValidation('Enter valid 10-digit Indian mobile number');
+      if (patient.symptoms.trim().length < 3) return failValidation('Describe symptoms or reason for visit');
+    }
+    return true;
+  };
+
+  const validateBooking = () => {
+    for (const targetStep of [stepIndex.doctor, stepIndex.slot, stepIndex.patient]) {
+      if (!validateStep(targetStep)) {
+        setStep(targetStep);
+        return false;
+      }
     }
     return true;
   };
@@ -91,12 +111,7 @@ export default function BookingPage() {
   const back = () => setStep((value) => Math.max(value - 1, 0));
 
   const submit = () => {
-    if (!validateStep()) return;
-    if (paymentBlocked) {
-      toast.error(slotBlockedMessage(paymentBlockedReason));
-      setStep(1);
-      return;
-    }
+    if (!validateBooking()) return;
     navigate('/payment', { state: { doctor, slot, date, patient, remaining: availability.remaining } });
   };
 
@@ -114,7 +129,8 @@ export default function BookingPage() {
         setDoctorId(matchedDoctor._id);
         const activeSlots = (matchedDoctor.slots || []).filter((item) => item.isActive !== false);
         const preferred = activeSlots.find((item) => `${item.label} ${item.startTime} ${item.endTime}`.toLowerCase().includes(result.timePreference));
-        setSlotId((preferred || activeSlots[0])?._id);
+        const candidate = preferred || activeSlots.find((item) => getSlotAvailability(matchedDoctor, item._id, result.date || date).isBookable);
+        setSlotId(candidate?._id || '');
       }
       if (result.date) setDate(result.date);
       if (result.symptoms) setPatient((current) => ({ ...current, symptoms: result.symptoms }));
@@ -183,8 +199,7 @@ export default function BookingPage() {
                           disabled={item.isAvailable === false}
                           onClick={() => {
                             setDoctorId(item._id);
-                            const nextSlot = item.slots.find((s) => s.isActive !== false);
-                            if (nextSlot) setSlotId(nextSlot._id);
+                            setSlotId('');
                           }}
                           className={`booking-select-card text-left transition ${doctorId === item._id ? 'active' : ''} ${item.isAvailable === false ? 'cursor-not-allowed opacity-60' : ''}`}
                         >
@@ -200,7 +215,7 @@ export default function BookingPage() {
                 {step === 1 && (
                   <div>
                     <h2 className="flex items-center gap-2 text-xl font-bold"><Calendar size={20} /> Date & OP slot</h2>
-                    <input type="date" min={today} max={maxBookingDate} className="field mt-4" value={date} onChange={(e) => setDate(e.target.value)} />
+                    <input type="date" min={today} max={maxBookingDate} className="field mt-4" value={date} onChange={(e) => { setDate(e.target.value); setSlotId(''); }} />
                     <p className="mt-2 text-xs text-slate-500">
                       Booking opens on today by default. Future tokens are available only until the admin-configured slot date.
                     </p>
@@ -214,6 +229,7 @@ export default function BookingPage() {
                             onClick={() => {
                               if (!info.isBookable || info.isFull) {
                                 toast.error(slotBlockedMessage(info.reasons?.[0] || (info.isFull ? 'Selected slot is full' : 'Selected slot is not bookable now')));
+                                setSlotId('');
                                 return;
                               }
                               setSlotId(item._id);
@@ -267,7 +283,7 @@ export default function BookingPage() {
                         ['Doctor', doctor?.name],
                         ['Specialty', doctor?.specialty],
                         ['Date', date],
-                        ['Slot', `${slot?.label} (${slot?.startTime}–${slot?.endTime})`],
+                        ['Slot', slot ? `${slot.label} (${slot.startTime}–${slot.endTime})` : 'No slot selected'],
                         ['Patient', patient.name],
                         ['Phone', patient.phone],
                         ['Fee', `INR ${consultationFee}`]

@@ -94,7 +94,7 @@ export default function Navbar() {
                   }
                 }}
               />
-              <button onClick={logout} className="btn-secondary hidden px-3 py-2 sm:inline-flex">
+              <button onClick={logout} className="btn-secondary hidden px-3 py-2 md:inline-flex">
                 <LogOut size={16} />
                 Logout
               </button>
