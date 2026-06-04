@@ -129,8 +129,8 @@ export default function Dashboard() {
         <div className="patient-hero-panel flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="live-badge">Patient portal</span>
-            <h1 className="mt-4 text-4xl font-bold">Hello, {user?.name}</h1>
-            <p className="mt-1 text-sm text-slate-500">{user?.email}</p>
+            <h1 className="text-wrap-anywhere mt-4 text-3xl font-bold sm:text-4xl">Hello, {user?.name}</h1>
+            <p className="text-wrap-anywhere mt-1 text-sm text-slate-500">{user?.email}</p>
           </div>
           <Link to="/book" className="btn-primary"><Plus size={18} /> Book new visit</Link>
         </div>
@@ -155,13 +155,13 @@ export default function Dashboard() {
             {active ? (
               <motion.div className="token-card relative z-10 mt-8 p-6" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm uppercase tracking-widest text-white/75">Your token today</p>
-                    <p className="mt-2 text-5xl font-bold">#{active.tokenNumber || 'Pending'}</p>
-                    <p className="mt-2 text-white/90">{active.doctor?.name} · {active.slotLabel}</p>
-                    <p className="text-sm text-white/70">{new Date(active.appointmentDate).toLocaleDateString()} · ~{active.estimatedWaitMinutes} min wait</p>
+                    <p className="text-wrap-anywhere mt-2 text-4xl font-bold sm:text-5xl">#{active.tokenNumber || 'Pending'}</p>
+                    <p className="text-wrap-anywhere mt-2 text-white/90">{active.doctor?.name} · {active.slotLabel}</p>
+                    <p className="text-wrap-anywhere text-sm text-white/70">{new Date(active.appointmentDate).toLocaleDateString()} · ~{active.estimatedWaitMinutes} min wait</p>
                   </div>
-                  <motion.div className="token-card-actions flex gap-2">
+                  <motion.div className="token-card-actions flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                     <button type="button" onClick={copyToken} className="token-card-btn token-card-btn-ghost">
                       <Copy size={16} /> Copy
                     </button>
@@ -228,14 +228,14 @@ export default function Dashboard() {
               {appointments.map((appointment) => (
                 <article key={appointment._id} className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-bold">{appointment.doctor?.name}</p>
-                      <p className="text-sm text-slate-500">{appointment.slotLabel} · {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
-                      <p className="mt-1 text-sm">Token: <strong>{appointment.tokenNumber || 'Pending'}</strong></p>
+                      <p className="text-wrap-anywhere text-sm text-slate-500">{appointment.slotLabel} · {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
+                      <p className="text-wrap-anywhere mt-1 text-sm">Token: <strong>{appointment.tokenNumber || 'Pending'}</strong></p>
                     </div>
                     <StatusBadge status={appointment.status} />
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <button type="button" onClick={() => downloadInvoice(appointment)} className="btn-secondary px-3 py-2 text-xs"><FileText size={14} /> Invoice</button>
                     <Link to="/book" className="btn-secondary px-3 py-2 text-xs"><RefreshCcw size={14} /> Rebook</Link>
                     {appointment.status !== 'cancelled' && (
@@ -306,9 +306,9 @@ export default function Dashboard() {
                 {records.map((record) => (
                   <article key={record._id} className="rounded-xl bg-white p-4 ring-1 ring-slate-100">
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="font-bold text-ink">{record.title}</p>
-                        <p className="text-xs capitalize text-slate-500">{record.type} · {new Date(record.createdAt).toLocaleString()}</p>
+                      <div className="min-w-0">
+                        <p className="text-wrap-anywhere font-bold text-ink">{record.title}</p>
+                        <p className="text-wrap-anywhere text-xs capitalize text-slate-500">{record.type} · {new Date(record.createdAt).toLocaleString()}</p>
                       </div>
                       <span className="rounded-full bg-medical-50 px-3 py-1 text-xs font-bold text-medical-700">AI saved</span>
                     </div>
@@ -342,12 +342,12 @@ export default function Dashboard() {
                 {!refunds.length && <p className="text-sm text-slate-500">No refund requests yet.</p>}
                 {refunds.map((refund) => (
                   <div key={refund._id} className="rounded-lg bg-white p-4 ring-1 ring-slate-100">
-                    <div className="flex justify-between gap-2">
-                      <p className="font-bold text-sm">{refund.reason}</p>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                      <p className="text-wrap-anywhere font-bold text-sm">{refund.reason}</p>
                       <StatusBadge status={refund.status} />
                     </div>
                     <p className="mt-1 text-xs text-slate-500">{new Date(refund.createdAt).toLocaleString()}</p>
-                    {refund.adminNote && <p className="mt-2 text-xs text-medical-700">{refund.adminNote}</p>}
+                    {refund.adminNote && <p className="text-wrap-anywhere mt-2 text-xs text-medical-700">{refund.adminNote}</p>}
                   </div>
                 ))}
               </div>

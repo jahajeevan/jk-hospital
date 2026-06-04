@@ -157,7 +157,7 @@ export default function BookingPage() {
               onChange={(event) => setAiRequest(event.target.value)}
               placeholder="Book dermatologist tomorrow evening"
             />
-            <button type="button" onClick={applyAiBooking} disabled={aiBookingLoading} className="btn-primary px-4 py-3 disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="button" onClick={applyAiBooking} disabled={aiBookingLoading} className="btn-primary w-full px-4 py-3 disabled:cursor-not-allowed disabled:opacity-60 lg:w-auto">
               {aiBookingLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
               Autofill
             </button>
@@ -220,14 +220,14 @@ export default function BookingPage() {
                             }}
                             className={`booking-slot-card ${slotId === item._id ? 'active' : ''} ${!info.isBookable || info.isFull ? 'locked' : ''}`}
                           >
-                            <div className="flex justify-between gap-2">
-                              <span className="font-bold">{item.label}</span>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                              <span className="text-wrap-anywhere font-bold">{item.label}</span>
                               <span className={info.remaining && info.isBookable ? 'text-emerald-600' : 'text-rose-600'}>
                                 {info.remaining && info.isBookable ? `${info.remaining} left` : <span className="inline-flex items-center gap-1"><Lock size={13} /> Locked</span>}
                               </span>
                             </div>
                             <p className="mt-1 text-sm text-slate-500">{item.startTime} – {item.endTime}</p>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="text-wrap-anywhere mt-1 text-xs text-slate-500">
                               Available {item.availableFrom || 'today'} to {item.availableUntil || 'until changed'} · book {item.advanceBookingMinutes ?? 60} min before start
                             </p>
                             <p className="mt-1 text-xs text-slate-400">Est. wait ~{info.estimatedWaitMinutes} min if you book now</p>
@@ -272,9 +272,9 @@ export default function BookingPage() {
                         ['Phone', patient.phone],
                         ['Fee', `INR ${consultationFee}`]
                       ].map(([label, value]) => (
-                        <li key={label} className="booking-review-row flex justify-between gap-4 rounded-lg px-4 py-3">
+                        <li key={label} className="booking-review-row flex flex-col gap-1 rounded-lg px-4 py-3 sm:flex-row sm:justify-between sm:gap-4">
                           <span className="text-slate-500">{label}</span>
-                          <span className="font-bold text-right">{value}</span>
+                          <span className="text-wrap-anywhere font-bold sm:text-right">{value}</span>
                         </li>
                       ))}
                     </ul>
@@ -319,8 +319,8 @@ export default function BookingPage() {
 
           <aside className="booking-summary-sticky">
             <p className="text-xs font-bold uppercase tracking-wider text-medical-600">Live summary</p>
-            <h3 className="mt-2 text-2xl font-bold">{doctor?.name || '—'}</h3>
-            <p className="text-sm text-slate-500">{doctor?.specialty}</p>
+            <h3 className="text-wrap-anywhere mt-2 text-2xl font-bold">{doctor?.name || '—'}</h3>
+            <p className="text-wrap-anywhere text-sm text-slate-500">{doctor?.specialty}</p>
             <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
               <motion.div className="liquid-stat rounded-lg p-3"><p className="text-lg font-bold">{slot?.tokenLimit || 0}</p><p className="text-slate-500">Total</p></motion.div>
               <motion.div className="liquid-stat rounded-lg p-3"><p className="text-lg font-bold">{availability.booked}</p><p className="text-slate-500">Booked</p></motion.div>
@@ -331,7 +331,7 @@ export default function BookingPage() {
                 <p className="mt-4 flex items-center gap-2 text-lg font-bold text-medical-700">
                   <IndianRupee size={20} /> {consultationFee}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">Consultation fee for {slot?.label}</p>
+                <p className="text-wrap-anywhere mt-1 text-xs text-slate-500">Consultation fee for {slot?.label}</p>
               </>
             ) : (
               <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Select date & slot to see the consultation fee.</p>

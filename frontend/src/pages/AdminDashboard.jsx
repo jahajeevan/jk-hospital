@@ -40,6 +40,31 @@ const defaultSlotForm = {
   isActive: true
 };
 
+const activeRevenueStatuses = new Set(['approved', 'confirmed', 'completed']);
+
+const bookingPatientEmail = (booking) =>
+  booking.patientEmail || booking.patientDetails?.email || booking.patient?.email || '';
+
+const bookingPaymentAmount = (booking) => {
+  const payment = Array.isArray(booking.payment) ? booking.payment[0] : booking.payment;
+  return Number(payment?.amount || 0);
+};
+
+const bookingPayment = (booking) => (Array.isArray(booking.payment) ? booking.payment[0] : booking.payment);
+
+const isOnlineVerifiedPayment = (booking) => ['stripe', 'razorpay'].includes(bookingPayment(booking)?.method);
+
+const buildOverviewFromBookings = (items, refunds = []) => ({
+  stats: {
+    appointments: items.length,
+    patients: new Set(items.map(bookingPatientEmail).filter(Boolean)).size,
+    pendingRefunds: refunds.filter((item) => item.status === 'pending').length,
+    revenue: items
+      .filter((item) => activeRevenueStatuses.has(item.status))
+      .reduce((sum, item) => sum + bookingPaymentAmount(item), 0)
+  }
+});
+
 export default function AdminDashboard() {
   const [unlocked, setUnlocked] = useState(() => isAdminSessionOpen());
   const [password, setPassword] = useState('');
@@ -56,34 +81,63 @@ export default function AdminDashboard() {
   const [slotForm, setSlotForm] = useState(defaultSlotForm);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadLocal = () => {
       const localBookings = getLocalBookings();
       const localDoctors = getLocalDoctors();
+      const localRefunds = getLocalRefunds();
+      if (cancelled) return;
       setBookings(localBookings);
       setDoctorList(localDoctors);
-      const localRefunds = getLocalRefunds();
       setRefunds(localRefunds);
-      setOverview({
-        stats: {
-          appointments: localBookings.length,
-          patients: new Set(localBookings.map((item) => item.patientEmail)).size,
-          pendingRefunds: localRefunds.filter((item) => item.status === 'pending').length,
-          revenue: localBookings.filter((item) => item.status === 'approved').reduce((sum, item) => sum + (item.payment?.amount || 0), 0)
-        }
-      });
+      setOverview(buildOverviewFromBookings(localBookings, localRefunds));
     };
-    loadLocal();
-    window.addEventListener('storage', loadLocal);
-    window.addEventListener('jk-local-sync', loadLocal);
+
+    const loadServer = async () => {
+      try {
+        const [overviewResponse, bookingsResponse] = await Promise.all([
+          api.get('/admin/overview'),
+          api.get('/admin/bookings')
+        ]);
+        if (cancelled) return;
+        const serverBookings = bookingsResponse.data?.appointments || [];
+        const localRefunds = getLocalRefunds();
+        setBookings(serverBookings);
+        setRefunds(localRefunds);
+        setDoctorList(getLocalDoctors());
+        setOverview(overviewResponse.data?.stats ? overviewResponse.data : buildOverviewFromBookings(serverBookings, localRefunds));
+      } catch (error) {
+        loadLocal();
+        toast.error(error.response?.data?.message || 'Could not load live admin data. Showing this browser data.');
+      }
+    };
+
+    void loadServer();
+    window.addEventListener('storage', loadServer);
+    window.addEventListener('jk-local-sync', loadServer);
     return () => {
-      window.removeEventListener('storage', loadLocal);
-      window.removeEventListener('jk-local-sync', loadLocal);
+      cancelled = true;
+      window.removeEventListener('storage', loadServer);
+      window.removeEventListener('jk-local-sync', loadServer);
     };
   }, []);
 
   const occupancy = useMemo(
-    () => doctorList.map((doctor) => ({ name: doctor.name.replace('Dr. ', ''), tokens: doctor.slots.reduce((sum, slot) => sum + (slot.bookedTokens || 0), 0) })),
-    [doctorList]
+    () => {
+      const counts = new Map();
+      bookings
+        .filter((booking) => !['cancelled', 'rejected', 'declined'].includes(booking.status))
+        .forEach((booking) => {
+          const name = booking.doctor?.name || 'Unknown';
+          counts.set(name, (counts.get(name) || 0) + 1);
+        });
+      if (counts.size) {
+        return Array.from(counts, ([name, tokens]) => ({ name: name.replace('Dr. ', ''), tokens }));
+      }
+      return doctorList.map((doctor) => ({ name: doctor.name.replace('Dr. ', ''), tokens: doctor.slots.reduce((sum, slot) => sum + (slot.bookedTokens || 0), 0) }));
+    },
+    [bookings, doctorList]
   );
 
   const dailyBookings = useMemo(() => {
@@ -106,14 +160,14 @@ export default function AdminDashboard() {
   }, [bookings, bookingQuery]);
 
   const statusBreakdown = useMemo(() => {
-    const counts = { payment_submitted: 0, approved: 0, declined: 0, cancelled: 0 };
+    const counts = { payment_submitted: 0, approved: 0, confirmed: 0, declined: 0, rejected: 0, cancelled: 0 };
     bookings.forEach((booking) => {
       counts[booking.status] = (counts[booking.status] || 0) + 1;
     });
     return [
       { name: 'Pending', value: counts.payment_submitted },
-      { name: 'Accepted', value: counts.approved },
-      { name: 'Declined', value: counts.declined },
+      { name: 'Accepted', value: counts.approved + counts.confirmed },
+      { name: 'Declined', value: counts.declined + counts.rejected },
       { name: 'Cancelled', value: counts.cancelled }
     ];
   }, [bookings]);
@@ -536,14 +590,14 @@ export default function AdminDashboard() {
                           <input className="field mt-1 px-2 py-1.5" type="number" min="0" value={slot.advanceBookingMinutes ?? 60} onChange={(event) => updateSlot(doctor._id, slot._id, 'advanceBookingMinutes', event.target.value)} />
                         </label>
                         </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <p className="text-xs text-slate-500">
+                        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-wrap-anywhere text-xs text-slate-500">
                             {slot.date ? `Only visible on ${slot.date}` : 'Regular slot'} · future booking {slot.availableUntil ? `until ${slot.availableUntil}` : 'has no end date'} · same-day cutoff {slot.advanceBookingMinutes ?? 60} min
                           </p>
                           <button
                             type="button"
                             onClick={() => updateSlot(doctor._id, slot._id, 'isActive', !slot.isActive)}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-bold ${slot.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-bold sm:shrink-0 ${slot.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}
                           >
                             {slot.isActive ? 'Active' : 'Hidden'}
                           </button>
@@ -565,11 +619,75 @@ export default function AdminDashboard() {
 
       {adminTab === 'bookings' && (
         <section className="glass mt-8 rounded-lg p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-bold">Recent bookings</h2>
-            <input className="field max-w-sm" placeholder="Search bookings..." value={bookingQuery} onChange={(e) => setBookingQuery(e.target.value)} />
+            <input className="field w-full md:max-w-sm" placeholder="Search bookings..." value={bookingQuery} onChange={(e) => setBookingQuery(e.target.value)} />
           </div>
-          <div className="mt-5 overflow-x-auto">
+
+          <div className="mt-5 grid gap-3 md:hidden">
+            {!filteredBookings.length && <p className="rounded-xl bg-white/70 p-4 text-sm text-slate-500">No bookings match your search.</p>}
+            {filteredBookings.map((booking) => {
+              const payment = bookingPayment(booking);
+              const verified = isOnlineVerifiedPayment(booking);
+              const patientName = booking.patientDetails?.name || booking.patient?.name || booking.patientName || 'Patient';
+              const patientIdentity = booking.patientId || bookingPatientEmail(booking) || 'No patient ID';
+              return (
+                <article key={booking._id} className="admin-booking-card">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="admin-card-eyebrow">Patient</p>
+                      <h3 className="admin-card-title">{patientName}</h3>
+                      <p className="text-wrap-anywhere mt-1 text-xs text-slate-500">{patientIdentity}</p>
+                    </div>
+                    <StatusBadge status={booking.status} />
+                  </div>
+
+                  <dl className="admin-card-details">
+                    <div>
+                      <dt>Doctor</dt>
+                      <dd>{booking.doctor?.name || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Slot</dt>
+                      <dd>{booking.slotLabel || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Token</dt>
+                      <dd>{booking.tokenNumber || 'Pending'}</dd>
+                    </div>
+                    <div>
+                      <dt>Payment</dt>
+                      <dd>
+                        {verified ? 'Verified online' : payment?.proofDataUrl ? 'Proof uploaded' : 'No proof'}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="admin-card-actions">
+                    {verified ? (
+                      <span className="admin-card-static-action">Auto-confirmed</span>
+                    ) : (
+                      <>
+                        {payment?.proofDataUrl && (
+                          <button type="button" onClick={() => setSelectedProof(payment)} className="admin-card-button neutral">
+                            <Eye size={14} /> View proof
+                          </button>
+                        )}
+                        <button type="button" onClick={() => decide(booking, 'approved')} className="admin-card-button accept">
+                          <MailCheck size={14} /> Accept
+                        </button>
+                        <button type="button" onClick={() => decide(booking, 'declined')} className="admin-card-button decline">
+                          Decline
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="text-slate-500">
                 <tr>
@@ -586,22 +704,22 @@ export default function AdminDashboard() {
                 {filteredBookings.map((booking) => (
                   <tr key={booking._id} className="border-t border-slate-200 dark:border-slate-800">
                     <td className="py-4">
-                      <p className="font-bold">{booking.patientDetails?.name || booking.patient?.name || booking.patientName}</p>
-                      <p className="text-xs text-slate-500">{booking.patientId || booking.patientEmail}</p>
+                      <p className="text-wrap-anywhere font-bold">{booking.patientDetails?.name || booking.patient?.name || booking.patientName}</p>
+                      <p className="text-wrap-anywhere text-xs text-slate-500">{booking.patientId || bookingPatientEmail(booking)}</p>
                     </td>
-                    <td>{booking.doctor?.name}</td>
-                    <td>{booking.slotLabel}</td>
+                    <td className="text-wrap-anywhere">{booking.doctor?.name}</td>
+                    <td className="text-wrap-anywhere">{booking.slotLabel}</td>
                     <td>{booking.tokenNumber}</td>
                     <td><StatusBadge status={booking.status} /></td>
                     <td>
-                      {['stripe', 'razorpay'].includes(booking.payment?.method) ? (
+                      {isOnlineVerifiedPayment(booking) ? (
                         <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Verified online</span>
-                      ) : booking.payment?.proofDataUrl ? (
-                        <button onClick={() => setSelectedProof(booking.payment)} className="rounded-lg border px-3 py-2 text-xs font-bold dark:border-slate-700"><Eye size={14} className="mr-1 inline" /> View</button>
+                      ) : bookingPayment(booking)?.proofDataUrl ? (
+                        <button onClick={() => setSelectedProof(bookingPayment(booking))} className="rounded-lg border px-3 py-2 text-xs font-bold dark:border-slate-700"><Eye size={14} className="mr-1 inline" /> View</button>
                       ) : 'No proof'}
                     </td>
                     <td>
-                      {['stripe', 'razorpay'].includes(booking.payment?.method) ? (
+                      {isOnlineVerifiedPayment(booking) ? (
                         <span className="text-xs font-bold text-slate-500">Auto-confirmed</span>
                       ) : (
                         <div className="flex gap-2">
@@ -628,9 +746,9 @@ export default function AdminDashboard() {
               return (
                 <article key={refund._id} className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap justify-between gap-3">
-                    <div>
-                      <p className="font-bold">{refund.email}</p>
-                      <p className="text-sm text-slate-500">{booking?.doctor?.name} · {refund.reason}</p>
+                    <div className="min-w-0">
+                      <p className="text-wrap-anywhere font-bold">{refund.email}</p>
+                      <p className="text-wrap-anywhere text-sm text-slate-500">{booking?.doctor?.name} · {refund.reason}</p>
                     </div>
                     <StatusBadge status={refund.status} />
                   </div>
@@ -755,8 +873,8 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-bold">Payment proof</h2>
               <button onClick={() => setSelectedProof(null)} className="rounded-lg border p-2 dark:border-slate-700"><X size={16} /></button>
             </div>
-            {selectedProof.proofDataUrl?.startsWith('data:image') ? <img src={selectedProof.proofDataUrl} alt="Payment proof" className="mt-4 max-h-[70vh] w-full rounded-lg object-contain" /> : <p className="mt-4">Proof file: {selectedProof.proofName}</p>}
-            <p className="mt-4 text-sm text-slate-500">Transaction: {selectedProof.transactionId}</p>
+            {selectedProof.proofDataUrl?.startsWith('data:image') ? <img src={selectedProof.proofDataUrl} alt="Payment proof" className="mt-4 max-h-[70vh] w-full rounded-lg object-contain" /> : <p className="text-wrap-anywhere mt-4">Proof file: {selectedProof.proofName}</p>}
+            <p className="text-wrap-anywhere mt-4 text-sm text-slate-500">Transaction: {selectedProof.transactionId}</p>
           </div>
         </div>
       )}

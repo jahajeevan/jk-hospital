@@ -19,7 +19,7 @@ export default function Services() {
         alt="Hospital services"
         minHeight="min-h-[48vh]"
         eyebrow={<span className="live-badge mb-4">Patient-first services</span>}
-        title={<h1 className="text-5xl font-bold">Care workflows built around time</h1>}
+        title={<h1 className="text-3xl font-bold sm:text-5xl">Care workflows built around time</h1>}
         subtitle={<p className="mt-4 max-w-2xl text-lg text-slate-600">Every service is designed to reduce waiting-room confusion and keep families informed.</p>}
       />
       <section className="container-pad -mt-12 pb-16">

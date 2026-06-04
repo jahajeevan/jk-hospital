@@ -18,6 +18,34 @@ body {
   overflow-x: hidden;
 }
 
+#root,
+.page-shell,
+.page-route-shell {
+  min-width: 0;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.text-wrap-anywhere,
+.ai-markdown,
+.ai-markdown *,
+.ai-message-bubble,
+.admin-booking-card,
+.admin-card-details dd,
+.patient-panel,
+.token-card,
+.booking-review-row,
+.booking-slot-card,
+.booking-select-card {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 body::before {
   position: fixed;
   inset: 0;
@@ -298,6 +326,7 @@ body::before {
 
 .field {
   @apply w-full rounded-xl border border-white/80 bg-white/60 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-medical-500 focus:ring-4 focus:ring-medical-100;
+  min-width: 0;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.95),
     inset 0 -10px 24px rgba(20,123,209,0.035),
@@ -2239,6 +2268,101 @@ body::before {
   border-radius: 1.4rem;
 }
 
+.admin-booking-card {
+  min-width: 0;
+  border-radius: 1rem;
+  border: 1px solid rgba(255,255,255,0.78);
+  background: rgba(255,255,255,0.72);
+  padding: 1rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 16px 42px rgba(8,47,73,0.08);
+}
+
+.admin-card-eyebrow {
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-card-title {
+  min-width: 0;
+  color: #102033;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.admin-card-details {
+  margin-top: 0.85rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.admin-card-details div {
+  min-width: 0;
+  border-radius: 0.75rem;
+  background: rgba(255,255,255,0.66);
+  padding: 0.7rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+
+.admin-card-details dt {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-card-details dd {
+  margin-top: 0.2rem;
+  color: #1e293b;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.admin-card-actions {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.admin-card-button,
+.admin-card-static-action {
+  display: inline-flex;
+  min-height: 2.55rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.admin-card-button.neutral {
+  border: 1px solid rgba(148,163,184,0.48);
+  background: rgba(255,255,255,0.72);
+  color: #334155;
+}
+
+.admin-card-button.accept {
+  background: rgba(236,253,245,0.9);
+  color: #047857;
+}
+
+.admin-card-button.decline {
+  background: rgba(255,241,242,0.9);
+  color: #be123c;
+}
+
+.admin-card-static-action {
+  background: rgba(241,245,249,0.86);
+  color: #64748b;
+}
+
 .section-pro {
   @apply py-20 md:py-24;
 }
@@ -2802,6 +2926,36 @@ body::before {
     position: static;
   }
 
+  .booking-review-row {
+    align-items: flex-start;
+  }
+
+  .token-card-actions .token-card-btn,
+  .patient-panel .btn-primary,
+  .patient-panel .btn-secondary,
+  .booking-main-card .btn-primary,
+  .booking-main-card .btn-secondary {
+    width: 100%;
+  }
+
+  .patient-panel,
+  .patient-empty-card,
+  .booking-main-card,
+  .booking-ai-strip,
+  .booking-stepper-wrap,
+  .booking-summary-sticky,
+  .glass {
+    min-width: 0;
+  }
+
+  [role="dialog"] footer > .flex {
+    flex-direction: column-reverse;
+  }
+
+  [role="dialog"] footer button {
+    width: 100%;
+  }
+
   .liquid-hero-button {
     min-width: 0;
   }
@@ -2911,6 +3065,10 @@ body::before {
 
   .ai-send-button {
     min-height: 3rem;
+  }
+
+  .ai-message-bubble {
+    max-width: 100%;
   }
 }
 

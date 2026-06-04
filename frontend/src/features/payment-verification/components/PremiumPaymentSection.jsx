@@ -272,7 +272,7 @@ export default function PremiumPaymentSection({ booking, user }) {
           <p className="flex items-center gap-2 font-semibold text-medical-600 dark:text-medical-300">
             <Sparkles size={16} /> Premium secure checkout
           </p>
-          <h1 className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">Pay consultation fee</h1>
+          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">Pay consultation fee</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             Stripe & Razorpay — verified before your token is issued.
           </p>
@@ -283,9 +283,9 @@ export default function PremiumPaymentSection({ booking, user }) {
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-medical-50 text-medical-700 dark:bg-medical-900/50">
                   <CreditCard size={22} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm text-slate-500 dark:text-slate-400">Consultation fee</p>
-                  <p className="mt-1 text-4xl font-bold text-slate-900 dark:text-white">INR {amount}</p>
+                  <p className="text-wrap-anywhere mt-1 text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">INR {amount}</p>
                   <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                     Flat fee · hospital verified
                   </p>
@@ -374,7 +374,7 @@ export default function PremiumPaymentSection({ booking, user }) {
 
             {checkoutError && (
               <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
-                {checkoutError}
+                <span className="text-wrap-anywhere">{checkoutError}</span>
               </p>
             )}
 
@@ -420,7 +420,7 @@ export default function PremiumPaymentSection({ booking, user }) {
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Booking summary</h2>
           <div className="mt-5 space-y-3 text-sm text-slate-700 dark:text-slate-300">
             {summary.map(([label, value]) => (
-              <p key={label}>
+              <p key={label} className="text-wrap-anywhere">
                 <strong>{label}:</strong> {value}
               </p>
             ))}

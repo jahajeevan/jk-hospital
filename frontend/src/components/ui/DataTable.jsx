@@ -1,6 +1,6 @@
 export default function DataTable({ columns, rows, keyField = 'id', empty = 'No records found' }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <div className="max-w-full overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900">
           <tr>
@@ -16,7 +16,7 @@ export default function DataTable({ columns, rows, keyField = 'id', empty = 'No 
             rows.map((row, index) => (
               <tr key={row[keyField] || index} className="text-slate-700 dark:text-slate-200">
                 {columns.map((column) => (
-                  <td key={column.key} className="whitespace-nowrap px-4 py-3">
+                  <td key={column.key} className="text-wrap-anywhere px-4 py-3 align-top">
                     {column.render ? column.render(row) : row[column.key]}
                   </td>
                 ))}
@@ -34,4 +34,3 @@ export default function DataTable({ columns, rows, keyField = 'id', empty = 'No 
     </div>
   );
 }
-

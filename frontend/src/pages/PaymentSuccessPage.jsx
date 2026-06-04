@@ -46,30 +46,30 @@ export default function PaymentSuccessPage() {
           <SuccessConfetti active />
           <div className="token-card relative z-10 mx-auto max-w-md p-6 text-left">
             <p className="text-sm uppercase tracking-[0.2em] text-white/80">JK Hospital token</p>
-            <p className="mt-2 text-5xl font-bold">#{appointment.tokenNumber}</p>
-            <p className="mt-3 text-white/90">{appointment.doctor?.name}</p>
-            <p className="text-sm text-white/75">
+            <p className="text-wrap-anywhere mt-2 text-4xl font-bold sm:text-5xl">#{appointment.tokenNumber}</p>
+            <p className="text-wrap-anywhere mt-3 text-white/90">{appointment.doctor?.name}</p>
+            <p className="text-wrap-anywhere text-sm text-white/75">
               {appointment.slotLabel} · {appointment.appointmentDate}
             </p>
           </div>
           <p className="mt-8 font-semibold text-emerald-600 dark:text-emerald-400">
             Payment verified by {gateway}
           </p>
-          <h1 className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">Appointment confirmed</h1>
+          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">Appointment confirmed</h1>
           <div className="mt-8 grid gap-3 rounded-xl bg-white p-5 text-left text-sm shadow-lg dark:bg-slate-800/80 sm:grid-cols-2">
-            <p>
+            <p className="text-wrap-anywhere">
               <strong>Doctor:</strong> {appointment.doctor?.name}
             </p>
-            <p>
+            <p className="text-wrap-anywhere">
               <strong>Slot:</strong> {appointment.slotLabel}
             </p>
-            <p>
+            <p className="text-wrap-anywhere">
               <strong>Invoice:</strong> {appointment.invoiceNumber}
             </p>
             <p>
               <strong>Amount:</strong> INR {appointment.payment?.amount}
             </p>
-            <p className="sm:col-span-2">
+            <p className="text-wrap-anywhere sm:col-span-2">
               <strong>Transaction:</strong> {appointment.payment?.transactionId}
             </p>
           </div>
