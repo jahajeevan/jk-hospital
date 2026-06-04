@@ -2969,6 +2969,18 @@ body.mobile-nav-open {
     display: none !important;
   }
 
+  .nav-direct-auth {
+    display: inline-flex;
+    min-height: 2.25rem;
+    border-radius: 0.72rem;
+    padding: 0.5rem 0.65rem !important;
+    font-size: 0.75rem;
+  }
+
+  .nav-direct-auth + .nav-direct-auth {
+    margin-left: 0.15rem;
+  }
+
   .liquid-nav {
     min-height: 3.15rem;
   }
@@ -3140,6 +3152,115 @@ body.mobile-nav-open {
   .patient-wow-page,
   .profile-completion-page {
     overflow-x: clip;
+  }
+
+  .patient-wow-page {
+    padding-top: 0.85rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .patient-hero-panel {
+    border-radius: 0.95rem;
+    padding: 0.85rem;
+    gap: 0.75rem;
+  }
+
+  .patient-hero-panel .live-badge {
+    padding: 0.36rem 0.58rem;
+    font-size: 0.64rem;
+  }
+
+  .patient-hero-panel h1 {
+    margin-top: 0.6rem !important;
+    font-size: clamp(1.45rem, 7.5vw, 1.9rem) !important;
+    line-height: 1.05;
+  }
+
+  .patient-hero-panel p {
+    font-size: 0.76rem;
+  }
+
+  .patient-hero-panel > .btn-primary {
+    min-height: 2.45rem;
+    border-radius: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .patient-mobile-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+  }
+
+  .patient-mobile-action {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 2.35rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255,255,255,0.78);
+    background: rgba(255,255,255,0.72);
+    padding: 0.5rem 0.55rem;
+    color: #26384d;
+    font-size: 0.76rem;
+    font-weight: 900;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.88), 0 8px 18px rgba(15,23,42,0.05);
+  }
+
+  .patient-mobile-action.primary {
+    color: white;
+    background: linear-gradient(180deg, #4d97ef, #1767c8);
+    box-shadow: 0 10px 22px rgba(37,99,235,0.2);
+  }
+
+  .patient-mobile-action.danger {
+    color: #9f1239;
+    background: rgba(255,241,242,0.86);
+  }
+
+  .patient-wow-page .mt-6 {
+    margin-top: 0.75rem;
+  }
+
+  .patient-wow-page .mt-8 {
+    margin-top: 0.9rem;
+  }
+
+  .patient-wow-page .tab-pill {
+    min-height: 2.25rem;
+    border-radius: 0.72rem;
+    padding: 0.5rem 0.62rem;
+    font-size: 0.76rem;
+  }
+
+  .patient-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .patient-metric-grid > * {
+    min-height: auto;
+    border-radius: 0.82rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .patient-panel,
+  .patient-empty-card {
+    border-radius: 0.9rem;
+    padding: 0.85rem !important;
+  }
+
+  .patient-empty-card {
+    text-align: left;
+  }
+
+  .patient-empty-card svg {
+    margin-left: 0;
+    margin-right: 0;
   }
 
   .booking-experience-page {

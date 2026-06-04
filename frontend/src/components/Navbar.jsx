@@ -116,11 +116,11 @@ export default function Navbar() {
             )}
           </nav>
           <div className="flex shrink-0 items-center gap-2">
-            <button type="button" className="rounded-lg border border-white/70 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Menu">
+            <button type="button" className="hidden rounded-lg border border-white/70 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Menu">
               {open ? <X size={20} /> : <Menu size={20} />}
             </button>
             {user ? (
-              <>
+              <div className="hidden md:flex md:items-center md:gap-2">
                 <UserButton
                   appearance={{
                     elements: {
@@ -129,17 +129,17 @@ export default function Navbar() {
                     }
                   }}
                 />
-                <button onClick={logout} className="btn-secondary hidden px-3 py-2 md:inline-flex">
+                <button onClick={logout} className="btn-secondary px-3 py-2">
                   <LogOut size={16} />
                   Logout
                 </button>
-              </>
+              </div>
             ) : (
               <>
-                <Link to="/login" className="nav-auth-link btn-secondary hidden px-4 py-2 min-[520px]:inline-flex">
+                <Link to="/login" className="btn-secondary nav-direct-auth px-3 py-2">
                   Login
                 </Link>
-                <Link to="/signup" className="nav-auth-link btn-primary hidden whitespace-nowrap px-4 py-2 min-[520px]:inline-flex">
+                <Link to="/signup" className="btn-primary nav-direct-auth whitespace-nowrap px-3 py-2">
                   Sign up
                 </Link>
               </>

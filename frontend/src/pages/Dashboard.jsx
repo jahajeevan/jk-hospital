@@ -1,4 +1,4 @@
-import { Bell, Bot, CalendarClock, Copy, FileText, Loader2, Plus, RefreshCcw, Save, ShieldAlert, Sparkles, Stethoscope, XCircle } from 'lucide-react';
+import { Bell, Bot, CalendarClock, Copy, FileText, Loader2, LogOut, Plus, RefreshCcw, Save, ShieldAlert, Sparkles, Stethoscope, XCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -33,7 +33,7 @@ const checklist = [
 ];
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [tab, setTab] = useState('overview');
   const [appointments, setAppointments] = useState([]);
   const [refunds, setRefunds] = useState([]);
@@ -133,6 +133,14 @@ export default function Dashboard() {
             <p className="text-wrap-anywhere mt-1 text-sm text-slate-500">{user?.email}</p>
           </div>
           <Link to="/book" className="btn-primary"><Plus size={18} /> Book new visit</Link>
+        </div>
+
+        <div className="patient-mobile-actions">
+          <Link to="/book" className="patient-mobile-action primary"><Plus size={16} /> Book</Link>
+          <button type="button" onClick={() => setTab('appointments')} className="patient-mobile-action"><CalendarClock size={16} /> Visits</button>
+          <button type="button" onClick={() => setTab('records')} className="patient-mobile-action"><Sparkles size={16} /> Records</button>
+          <button type="button" onClick={() => setTab('refunds')} className="patient-mobile-action"><ShieldAlert size={16} /> Refunds</button>
+          <button type="button" onClick={logout} className="patient-mobile-action danger"><LogOut size={16} /> Logout</button>
         </div>
 
         <motion.div className="mt-6 flex flex-wrap gap-2">
