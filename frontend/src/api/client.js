@@ -1,6 +1,14 @@
 import axios from 'axios';
 
-const rawApiUrl = import.meta.env.VITE_API_URL || '/api';
+const inferProductionApiUrl = () => {
+  if (typeof window === 'undefined') return '/api';
+  const { hostname, protocol } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local')) return '/api';
+  const domain = hostname.startsWith('www.') ? hostname.slice(4) : hostname;
+  return `${protocol}//api.${domain}/api`;
+};
+
+const rawApiUrl = import.meta.env.VITE_API_URL || inferProductionApiUrl();
 const normalizedApiUrl = rawApiUrl === '/api' || rawApiUrl.endsWith('/api')
   ? rawApiUrl
   : `${rawApiUrl.replace(/\/$/, '')}/api`;
@@ -13,6 +21,9 @@ const api = axios.create({
 
 const formatApiError = (error) => {
   if (error.code === 'ERR_NETWORK' || !error.response) {
+    if (normalizedApiUrl !== '/api') {
+      return `Cannot reach JK Hospital API at ${normalizedApiUrl}. Check that the backend is deployed and CORS allows this website.`;
+    }
     return 'Cannot reach JK Hospital server. Run `npm run dev` in the project root so the backend starts on port 5001.';
   }
   return error.response?.data?.message || error.message || 'Request failed';

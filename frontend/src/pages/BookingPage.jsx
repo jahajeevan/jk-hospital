@@ -1,9 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Bot, Calendar, CheckCircle2, Clock3, CreditCard, IndianRupee, Loader2, Lock, Sparkles, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, Clock3, CreditCard, IndianRupee, Lock, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
-import api, { formatApiError } from '../api/client.js';
 import AiVisitPrep from '../components/AiVisitPrep.jsx';
 import BookingStepper from '../components/BookingStepper.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -40,8 +39,6 @@ export default function BookingPage() {
   const [date, setDate] = useState(today);
   const [slotId, setSlotId] = useState('');
   const [patient, setPatient] = useState({ name: user?.name || '', age: '', gender: '', phone: '', symptoms: '' });
-  const [aiRequest, setAiRequest] = useState('');
-  const [aiBookingLoading, setAiBookingLoading] = useState(false);
 
   useEffect(() => {
     const sync = () => setDoctors(getLocalDoctors());
@@ -63,7 +60,8 @@ export default function BookingPage() {
     ? boundedSlotDates.map((item) => item.availableUntil).sort().at(-1)
     : undefined;
   const consultationFee = normalizeFee(slot?.fee, doctor?.fee);
-  const showPrice = step >= 1 && Boolean(slot?._id);
+  const showTokenSummary = Boolean(doctor?._id && slot?._id);
+  const showPrice = showTokenSummary;
   const paymentBlocked = !slot || !availability.isBookable || availability.isFull;
   const paymentBlockedReason = !slot ? 'Select an available OP slot' : availability.reasons?.[0] || (availability.isFull ? 'Selected slot is full' : 'Selected slot is not bookable now');
 
@@ -115,33 +113,6 @@ export default function BookingPage() {
     navigate('/payment', { state: { doctor, slot, date, patient, remaining: availability.remaining } });
   };
 
-  const applyAiBooking = async () => {
-    const text = aiRequest.trim();
-    if (text.length < 4) return toast.error('Tell AI what appointment you want, for example: dermatologist tomorrow evening.');
-    setAiBookingLoading(true);
-    try {
-      const { data } = await api.post('/ai/appointment-assist', { message: text });
-      const result = data.result || {};
-      const matchedDoctor = doctors.find((item) =>
-        `${item.name} ${item.specialty}`.toLowerCase().includes(String(result.specialization || '').toLowerCase())
-      );
-      if (matchedDoctor) {
-        setDoctorId(matchedDoctor._id);
-        const activeSlots = (matchedDoctor.slots || []).filter((item) => item.isActive !== false);
-        const preferred = activeSlots.find((item) => `${item.label} ${item.startTime} ${item.endTime}`.toLowerCase().includes(result.timePreference));
-        const candidate = preferred || activeSlots.find((item) => getSlotAvailability(matchedDoctor, item._id, result.date || date).isBookable);
-        setSlotId(candidate?._id || '');
-      }
-      if (result.date) setDate(result.date);
-      if (result.symptoms) setPatient((current) => ({ ...current, symptoms: result.symptoms }));
-      toast.success(result.patientMessage || 'AI filled the appointment details. Please review before continuing.');
-    } catch (error) {
-      toast.error(formatApiError(error));
-    } finally {
-      setAiBookingLoading(false);
-    }
-  };
-
   return (
     <main className="booking-experience-page min-h-[calc(100vh-4rem)] py-10">
       <div className="container-pad">
@@ -157,28 +128,6 @@ export default function BookingPage() {
             <span>Same-day tokens close one hour before the selected slot starts.</span>
           </div>
         </section>
-
-        <div className="booking-ai-strip">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="flex items-start gap-3 lg:w-72">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-medical-600 text-white"><Bot size={20} /></span>
-              <div>
-                <p className="flex items-center gap-2 font-bold text-ink"><Sparkles size={16} className="text-medical-600" /> AI appointment assistant</p>
-                <p className="text-sm text-slate-500">Describe the appointment and Gemma3 will prefill what it can.</p>
-              </div>
-            </div>
-            <input
-              className="field flex-1"
-              value={aiRequest}
-              onChange={(event) => setAiRequest(event.target.value)}
-              placeholder="Book dermatologist tomorrow evening"
-            />
-                <button type="button" onClick={applyAiBooking} disabled={aiBookingLoading} className="btn-primary w-full px-4 py-3 disabled:cursor-not-allowed disabled:opacity-60 lg:w-auto">
-              {aiBookingLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              Autofill
-            </button>
-          </div>
-        </div>
 
         <div className="mt-8 booking-stepper-wrap">
           <BookingStepper steps={STEPS} current={step} />
@@ -333,6 +282,7 @@ export default function BookingPage() {
             </div>
           </section>
 
+          {showTokenSummary ? (
           <aside className="booking-summary-sticky">
             <p className="text-xs font-bold uppercase tracking-wider text-medical-600">Live summary</p>
             <h3 className="text-wrap-anywhere mt-2 text-2xl font-bold">{doctor?.name || '—'}</h3>
@@ -355,6 +305,7 @@ export default function BookingPage() {
             <p className="mt-2 text-sm text-slate-500">Queue estimate: ~{availability.estimatedWaitMinutes} minutes</p>
             {availability.reasons?.length ? <p className="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{availability.reasons[0]}</p> : null}
           </aside>
+          ) : null}
         </div>
       </div>
     </main>

@@ -1,19 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  AlertTriangle,
-  Bot,
-  ClipboardPenLine,
   Cpu,
   Eraser,
-  FileText,
   Gauge,
-  HelpCircle,
   HeartPulse,
   LifeBuoy,
   Loader2,
   MessageSquareText,
   Mic,
-  Pill,
   Route,
   Send,
   ShieldCheck,
@@ -32,64 +26,37 @@ const createAiSessionId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.r
 
 const tools = [
   { id: 'chat', label: 'Chatbot', icon: MessageSquareText, placeholder: 'Ask about symptoms, departments, visiting hours, appointment steps, or hospital FAQs...' },
-  { id: 'symptom', label: 'Department', icon: Route, placeholder: 'Example: I have chest pain and shortness of breath' },
-  { id: 'triage', label: 'Triage', icon: AlertTriangle, placeholder: 'Describe urgent symptoms for severity guidance...' },
-  { id: 'report', label: 'Report', icon: FileText, placeholder: 'Paste report text or OCR result here...' },
-  { id: 'prescription', label: 'Prescription', icon: Pill, placeholder: 'Paste prescription text. AI will explain purpose and precautions, not dosage.' },
-  { id: 'doctor-note', label: 'Doctor Note', icon: ClipboardPenLine, placeholder: 'Example: fever 3 days bp normal...' },
-  { id: 'faq', label: 'FAQ', icon: HelpCircle, placeholder: 'Ask about ambulance, insurance, departments, admission, timings...' }
+  { id: 'symptom', label: 'Symptoms', icon: Route, placeholder: 'Write symptoms clearly. Example: fever, cough, and body pain for three days...' }
 ];
 
 const quickActions = [
-  { tool: 'triage', label: 'Emergency triage', prompt: 'I have chest pain and shortness of breath. What should I do right now?' },
-  { tool: 'symptom', label: 'Route department', prompt: 'I have fever, cough, and body pain for three days.' },
-  { tool: 'faq', label: 'Hospital help desk', prompt: 'What is the ambulance or emergency contact for JK Hospital?' },
-  { tool: 'report', label: 'Explain report', prompt: 'Hemoglobin 10.2 g/dL, WBC 8200, Platelets 2.5 lakh. Please explain in simple words.' }
+  { tool: 'symptom', label: 'Summarize symptoms', prompt: 'I have fever, cough, and body pain for three days.' },
+  { tool: 'chat', label: 'Hospital help desk', prompt: 'What is the emergency contact for JK Hospital?' }
 ];
 
 const initialAssistantMessage = {
   role: 'assistant',
-  text: `Hello, I am JK Hospital's local AI assistant powered by Gemma3:4B on Ollama. I can help with department suggestions, visit prep, reports, prescriptions, FAQs, and emergency guidance.\n\n${disclaimer}`
+  text: `Hello, I am JK Hospital's local AI assistant powered by Gemma3:4B on Ollama. I can chat about hospital questions and help summarize symptoms for the right department.\n\n${disclaimer}`
 };
 
 const endpointByTool = {
   chat: '/ai/chat',
-  symptom: '/ai/symptom-route',
-  triage: '/ai/triage',
-  report: '/ai/report-summary',
-  prescription: '/ai/prescription-explain',
-  'doctor-note': '/ai/doctor-note',
-  faq: '/ai/faq'
+  symptom: '/ai/symptom-route'
 };
 
 const bodyByTool = (tool, input, sessionId) => {
   if (tool === 'chat') return { message: input, sessionId };
-  if (tool === 'symptom' || tool === 'triage') return { symptoms: input };
-  if (tool === 'report') return { reportText: input };
-  if (tool === 'prescription') return { prescriptionText: input };
-  if (tool === 'doctor-note') return { note: input };
-  return { question: input };
+  return { symptoms: input };
 };
 
 const responseText = (tool, payload) => {
   if (tool === 'chat') return payload.message;
-  if (tool === 'report') return payload.summary;
-  if (tool === 'prescription') return payload.explanation;
-  if (tool === 'doctor-note') return payload.formattedNote;
-  if (tool === 'faq') return payload.answer;
   const result = payload.result || {};
-  if (tool === 'symptom') {
-    return `**Recommended department:** ${result.department || 'General Medicine'}\n\n**Urgency:** ${result.urgency || 'routine'}\n\n${result.reason || ''}\n\n${(result.redFlags || []).map((item) => `- ${item}`).join('\n')}\n\n${result.disclaimer || disclaimer}`;
-  }
-  return `**Severity:** ${result.severity || 'medium'}\n\n**Recommended department:** ${result.recommendedDepartment || 'Emergency Medicine'}\n\n${result.reason || ''}\n\n**Immediate action:** ${result.immediateAction || 'Seek medical attention if symptoms are severe or worsening.'}\n\n${(result.redFlags || []).map((item) => `- ${item}`).join('\n')}\n\n${result.disclaimer || disclaimer}`;
+  return `**Symptom summary:** ${result.summary || result.reason || 'Symptoms reviewed.'}\n\n**Recommended department:** ${result.department || 'General Medicine'}\n\n**Urgency:** ${result.urgency || 'routine'}\n\n${(result.redFlags || []).map((item) => `- ${item}`).join('\n')}\n\n${result.disclaimer || disclaimer}`;
 };
 
-const offlineResponse = (tool) => {
-  if (tool === 'faq') {
-    return `Local AI is unavailable right now, but the hospital platform is still online.\n\nFor emergencies, contact JK Hospital at 7845265507. For timings, insurance, admissions, and department availability, please confirm with the hospital desk.\n\nTo restore AI answers, start Ollama and make sure gemma3:4b is available on port 11434.\n\n${disclaimer}`;
-  }
-  return `Local AI is unavailable right now. Please start Ollama and make sure gemma3:4b is running on http://127.0.0.1:11434.\n\nTry:\n\nollama serve\nollama pull gemma3:4b\n\n${disclaimer}`;
-};
+const offlineResponse = () =>
+  `Local AI is unavailable right now. Please start Ollama and make sure gemma3:4b is running on http://127.0.0.1:11434.\n\nTry:\n\nollama serve\nollama pull gemma3:4b\n\n${disclaimer}`;
 
 export default function SmartAiPage() {
   const [activeTool, setActiveTool] = useState('chat');
@@ -165,8 +132,8 @@ export default function SmartAiPage() {
             <span className="ai-lab-badge"><Sparkles size={14} /> Local Gemma3:4B assistant</span>
             <h1>Ask JK Hospital before your visit.</h1>
             <p>
-              Get calm guidance for department routing, visit preparation, reports, prescriptions,
-              FAQs, and urgent symptom next steps. For emergencies, call 7845265507 immediately.
+              Use the chatbot for hospital questions, or write symptoms so the assistant can summarize
+              them and suggest the right department. For emergencies, call 7845265507 immediately.
             </p>
             <div className="ai-lab-quick">
               {quickActions.map((action) => (
@@ -227,7 +194,7 @@ export default function SmartAiPage() {
                 <span className="ai-console-icon"><HeartPulse size={20} /></span>
                 <div className="min-w-0">
                   <p>{active.label} care mode</p>
-                  <span>Gemma3:4B local AI with hospital safety checks</span>
+                  <span>Gemma3:4B local AI for chat and symptom guidance</span>
                 </div>
               </div>
               <div className="ai-console-actions">

@@ -280,6 +280,10 @@ body.mobile-nav-open {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.88);
 }
 
+.mobile-top-logout {
+  display: none;
+}
+
 .brand-lockup {
   display: inline-flex;
   min-width: 0;
@@ -2991,6 +2995,24 @@ body.mobile-nav-open {
     gap: 0.5rem;
   }
 
+  .mobile-top-logout {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border-radius: 0.72rem;
+    border: 1px solid rgba(255,255,255,0.78);
+    background: rgba(255,255,255,0.72);
+    padding: 0.46rem 0.64rem;
+    color: #26384d;
+    font-size: 0.74rem;
+    font-weight: 900;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 18px rgba(15,23,42,0.055);
+    backdrop-filter: blur(20px) saturate(1.3);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  }
+
   .navbar-brand .brand-wordmark {
     font-size: 0.72rem;
   }
@@ -3187,43 +3209,8 @@ body.mobile-nav-open {
     font-size: 0.8rem;
   }
 
-  .patient-mobile-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
-    margin-top: 0.65rem;
-  }
-
-  .patient-mobile-action {
-    display: inline-flex;
-    min-width: 0;
-    min-height: 2.35rem;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(255,255,255,0.78);
-    background: rgba(255,255,255,0.72);
-    padding: 0.5rem 0.55rem;
-    color: #26384d;
-    font-size: 0.76rem;
-    font-weight: 900;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.88), 0 8px 18px rgba(15,23,42,0.05);
-  }
-
-  .patient-mobile-action.primary {
-    color: white;
-    background: linear-gradient(180deg, #4d97ef, #1767c8);
-    box-shadow: 0 10px 22px rgba(37,99,235,0.2);
-  }
-
-  .patient-mobile-action.danger {
-    color: #9f1239;
-    background: rgba(255,241,242,0.86);
-  }
-
   .patient-wow-page .mt-6 {
-    margin-top: 0.75rem;
+    margin-top: 0.7rem;
   }
 
   .patient-wow-page .mt-8 {
@@ -3231,21 +3218,31 @@ body.mobile-nav-open {
   }
 
   .patient-wow-page .tab-pill {
-    min-height: 2.25rem;
+    min-height: 2rem;
     border-radius: 0.72rem;
-    padding: 0.5rem 0.62rem;
-    font-size: 0.76rem;
+    padding: 0.42rem 0.54rem;
+    font-size: 0.72rem;
   }
 
   .patient-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.55rem;
+    gap: 0.5rem;
   }
 
   .patient-metric-grid > * {
     min-height: auto;
     border-radius: 0.82rem !important;
-    padding: 0.75rem !important;
+    padding: 0.62rem !important;
+  }
+
+  .patient-metric-grid > * p:first-of-type {
+    font-size: 0.64rem !important;
+    line-height: 1.1;
+  }
+
+  .patient-metric-grid > * p:last-of-type {
+    font-size: 1.6rem !important;
+    line-height: 1.05;
   }
 
   .patient-panel,
@@ -3556,7 +3553,8 @@ body.mobile-nav-open {
   }
 
   .patient-hero-panel h1 {
-    font-size: clamp(2.25rem, 12vw, 3rem);
+    font-size: clamp(1.45rem, 7.5vw, 1.9rem) !important;
+    line-height: 1.06;
   }
 
 }

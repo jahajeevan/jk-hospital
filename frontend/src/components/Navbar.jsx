@@ -116,24 +116,32 @@ export default function Navbar() {
             )}
           </nav>
           <div className="flex shrink-0 items-center gap-2">
-            <button type="button" className="hidden rounded-lg border border-white/70 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Menu">
-              {open ? <X size={20} /> : <Menu size={20} />}
-            </button>
+            {!user ? (
+              <button type="button" className="hidden rounded-lg border border-white/70 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Menu">
+                {open ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            ) : null}
             {user ? (
-              <div className="hidden md:flex md:items-center md:gap-2">
-                <UserButton
-                  appearance={{
-                    elements: {
-                      avatarBox: 'h-10 w-10 rounded-xl shadow-[0_10px_24px_rgba(13,99,173,0.18)]',
-                      userButtonPopoverCard: 'rounded-2xl border border-slate-200 shadow-[0_24px_80px_rgba(8,47,73,0.16)]'
-                    }
-                  }}
-                />
-                <button onClick={logout} className="btn-secondary px-3 py-2">
+              <>
+                <button onClick={logout} className="mobile-top-logout">
                   <LogOut size={16} />
                   Logout
                 </button>
-              </div>
+                <div className="hidden md:flex md:items-center md:gap-2">
+                  <UserButton
+                    appearance={{
+                      elements: {
+                        avatarBox: 'h-10 w-10 rounded-xl shadow-[0_10px_24px_rgba(13,99,173,0.18)]',
+                        userButtonPopoverCard: 'rounded-2xl border border-slate-200 shadow-[0_24px_80px_rgba(8,47,73,0.16)]'
+                      }
+                    }}
+                  />
+                  <button onClick={logout} className="btn-secondary px-3 py-2">
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <Link to="/login" className="btn-secondary nav-direct-auth px-3 py-2">
