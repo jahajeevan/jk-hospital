@@ -22,8 +22,37 @@ export default function Navbar() {
   };
 
   useEffect(() => {
-    document.body.classList.toggle('mobile-nav-open', open);
-    return () => document.body.classList.remove('mobile-nav-open');
+    if (!open) return undefined;
+
+    const scrollY = window.scrollY;
+    const { style } = document.body;
+    const previous = {
+      left: style.left,
+      overflow: style.overflow,
+      position: style.position,
+      right: style.right,
+      top: style.top,
+      width: style.width
+    };
+
+    document.body.classList.add('mobile-nav-open');
+    style.position = 'fixed';
+    style.top = `-${scrollY}px`;
+    style.left = '0';
+    style.right = '0';
+    style.width = '100%';
+    style.overflow = 'hidden';
+
+    return () => {
+      document.body.classList.remove('mobile-nav-open');
+      style.position = previous.position;
+      style.top = previous.top;
+      style.left = previous.left;
+      style.right = previous.right;
+      style.width = previous.width;
+      style.overflow = previous.overflow;
+      window.scrollTo(0, scrollY);
+    };
   }, [open]);
 
   const links = user
