@@ -60,8 +60,8 @@ export default function PremiumPaymentSection({ booking, user }) {
   const [providers, setProviders] = useState({ razorpay: true, stripe: true });
   const [configLoading, setConfigLoading] = useState(true);
   const [checkoutError, setCheckoutError] = useState('');
-  const [gateway, setGateway] = useState(() => sessionStorage.getItem(PROVIDER_KEY) || 'razorpay');
-  const [selectedMode, setSelectedMode] = useState(() => sessionStorage.getItem(PAYMENT_MODE_KEY) || 'upi');
+  const [gateway, setGateway] = useState(() => localStorage.getItem(PROVIDER_KEY) || 'razorpay');
+  const [selectedMode, setSelectedMode] = useState(() => localStorage.getItem(PAYMENT_MODE_KEY) || 'upi');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
     const stored = localStorage.getItem(VOICE_PREF_KEY);
@@ -89,9 +89,9 @@ export default function PremiumPaymentSection({ booking, user }) {
   }, [booking, user]);
 
   useEffect(() => {
-    sessionStorage.setItem(BOOKING_KEY, JSON.stringify(booking));
-    sessionStorage.setItem(PAYMENT_MODE_KEY, selectedMode);
-    sessionStorage.setItem(PROVIDER_KEY, gateway);
+    localStorage.setItem(BOOKING_KEY, JSON.stringify(booking));
+    localStorage.setItem(PAYMENT_MODE_KEY, selectedMode);
+    localStorage.setItem(PROVIDER_KEY, gateway);
   }, [booking, selectedMode, gateway]);
 
   useEffect(() => {
@@ -138,9 +138,9 @@ export default function PremiumPaymentSection({ booking, user }) {
       setSearchParams({}, { replace: true });
       const appointment = await verifyStripe(booking, user, sessionId);
       if (appointment) {
-        sessionStorage.removeItem(BOOKING_KEY);
-        sessionStorage.removeItem(PAYMENT_MODE_KEY);
-        sessionStorage.removeItem(PROVIDER_KEY);
+        localStorage.removeItem(BOOKING_KEY);
+        localStorage.removeItem(PAYMENT_MODE_KEY);
+        localStorage.removeItem(PROVIDER_KEY);
         setTimeout(() => {
           navigate('/payment-success', { replace: true, state: { appointment } });
         }, 900);
@@ -206,9 +206,9 @@ export default function PremiumPaymentSection({ booking, user }) {
           setCheckoutLoading(false);
           const appointment = await verifyRazorpay(booking, user, response, amount);
           if (appointment) {
-            sessionStorage.removeItem(BOOKING_KEY);
-            sessionStorage.removeItem(PAYMENT_MODE_KEY);
-            sessionStorage.removeItem(PROVIDER_KEY);
+            localStorage.removeItem(BOOKING_KEY);
+            localStorage.removeItem(PAYMENT_MODE_KEY);
+            localStorage.removeItem(PROVIDER_KEY);
             setTimeout(() => {
               navigate('/payment-success', { replace: true, state: { appointment } });
             }, 900);

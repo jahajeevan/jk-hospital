@@ -31,7 +31,7 @@ export default function PaymentPage() {
   const [booking, setBooking] = useState(() => {
     if (state) return state;
     try {
-      return JSON.parse(sessionStorage.getItem(BOOKING_KEY));
+      return JSON.parse(localStorage.getItem(BOOKING_KEY));
     } catch {
       return null;
     }
@@ -39,7 +39,7 @@ export default function PaymentPage() {
 
   useEffect(() => {
     if (state) {
-      sessionStorage.setItem(BOOKING_KEY, JSON.stringify(state));
+      localStorage.setItem(BOOKING_KEY, JSON.stringify(state));
       setBooking(state);
     }
   }, [state]);

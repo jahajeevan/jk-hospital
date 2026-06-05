@@ -54,7 +54,10 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     sessionStorage.removeItem(AI_MESSAGES_KEY);
     sessionStorage.removeItem(AI_SESSION_KEY);
-    PAYMENT_KEYS.forEach((key) => sessionStorage.removeItem(key));
+    PAYMENT_KEYS.forEach((key) => {
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+    });
     sessionStorage.removeItem('jk_token');
     sessionStorage.removeItem('jk_user');
     localStorage.removeItem('jk_token');
