@@ -1,18 +1,47 @@
 import axios from 'axios';
 
+const LOCAL_API_HOSTS = new Set(['localhost', '127.0.0.1']);
+
+const isLocalHostname = (hostname) =>
+  LOCAL_API_HOSTS.has(hostname) || hostname.endsWith('.local');
+
 const inferProductionApiUrl = () => {
   if (typeof window === 'undefined') return '/api';
   const { hostname, protocol } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local')) return '/api';
+  if (isLocalHostname(hostname)) return '/api';
   const domain = hostname.startsWith('www.') ? hostname.slice(4) : hostname;
   return `${protocol}//api.${domain}/api`;
 };
 
-const configuredApiUrl = import.meta.env.VITE_API_URL;
-const rawApiUrl =
-  configuredApiUrl === '/api' && typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)
-    ? inferProductionApiUrl()
-    : configuredApiUrl || inferProductionApiUrl();
+/** Strip accidental `.env` paste values like `VITE_API_URL=https://...`. */
+const sanitizeConfiguredApiUrl = (value) => {
+  if (!value || typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('VITE_API_URL=')) {
+    return trimmed.slice('VITE_API_URL='.length).trim();
+  }
+  return trimmed;
+};
+
+const isAbsoluteHttpUrl = (value) => /^https?:\/\//i.test(value);
+
+const resolveApiUrl = () => {
+  const configuredApiUrl = sanitizeConfiguredApiUrl(import.meta.env.VITE_API_URL);
+  const onProductionHost =
+    typeof window !== 'undefined' && !isLocalHostname(window.location.hostname);
+
+  if (onProductionHost) {
+    if (!configuredApiUrl || configuredApiUrl === '/api' || !isAbsoluteHttpUrl(configuredApiUrl)) {
+      return inferProductionApiUrl();
+    }
+    return configuredApiUrl;
+  }
+
+  return configuredApiUrl || '/api';
+};
+
+const rawApiUrl = resolveApiUrl();
 const normalizedApiUrl = rawApiUrl === '/api' || rawApiUrl.endsWith('/api')
   ? rawApiUrl
   : `${rawApiUrl.replace(/\/$/, '')}/api`;

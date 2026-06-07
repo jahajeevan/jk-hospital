@@ -29,6 +29,11 @@ import api, { formatApiError } from '../../../api/client.js';
  */
 export const fetchPaymentConfig = async () => {
   const { data } = await api.get('/payments/config');
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    const error = new Error('Payment server returned an invalid response. The site may be pointing at the wrong API URL.');
+    error.code = 'ERR_BAD_PAYMENT_CONFIG';
+    throw error;
+  }
   return data;
 };
 

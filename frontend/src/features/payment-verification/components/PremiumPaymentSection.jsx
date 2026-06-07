@@ -113,8 +113,10 @@ export default function PremiumPaymentSection({ booking, user }) {
     localStorage.setItem(VOICE_PREF_KEY, String(voiceEnabled));
   }, [voiceEnabled]);
 
-  useEffect(() => {
-    withRetry(fetchPaymentConfig, 2)
+  const loadPaymentConfig = useCallback(() => {
+    setConfigLoading(true);
+    setCheckoutError('');
+    return withRetry(fetchPaymentConfig, 2)
       .then((config) => {
         const nextProviders = {
           razorpay: Boolean(config.razorpay),
@@ -123,7 +125,11 @@ export default function PremiumPaymentSection({ booking, user }) {
         setProviders(nextProviders);
         if (nextProviders.razorpay) setGateway('razorpay');
         else if (nextProviders.stripe) setGateway('stripe');
-        else setCheckoutError('No online payment gateway is configured. Add Razorpay or Stripe keys in backend/.env and restart the server.');
+        else {
+          setCheckoutError(
+            'No online payment gateway is configured on the JK Hospital API. Add Razorpay or Stripe keys to the backend host and restart the server.'
+          );
+        }
       })
       .catch((error) => {
         setProviders({ razorpay: false, stripe: false });
@@ -131,6 +137,10 @@ export default function PremiumPaymentSection({ booking, user }) {
       })
       .finally(() => setConfigLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadPaymentConfig();
+  }, [loadPaymentConfig]);
 
   useEffect(() => {
     if (configLoading) return;
@@ -392,9 +402,15 @@ export default function PremiumPaymentSection({ booking, user }) {
               <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
                 <p className="text-wrap-anywhere">{checkoutError}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-rose-700 ring-1 ring-rose-100" onClick={startCheckout} disabled={checkoutLoading || isProcessing}>
-                    Try payment again
-                  </button>
+                  {noGatewayConfigured ? (
+                    <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-rose-700 ring-1 ring-rose-100" onClick={loadPaymentConfig} disabled={configLoading || checkoutLoading || isProcessing}>
+                      Check gateways again
+                    </button>
+                  ) : (
+                    <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-rose-700 ring-1 ring-rose-100" onClick={startCheckout} disabled={checkoutLoading || isProcessing}>
+                      Try payment again
+                    </button>
+                  )}
                   {providers.stripe && gateway !== 'stripe' ? (
                     <button type="button" className="rounded-lg bg-[#635bff] px-3 py-2 text-xs font-bold text-white" onClick={() => setGateway('stripe')} disabled={checkoutLoading || isProcessing}>
                       Use Stripe instead
