@@ -40,10 +40,10 @@ export default function App() {
         <Route path="/services" element={<Suspense fallback={<ScreenLoader />}><Services /></Suspense>} />
         <Route path="/ai" element={<Suspense fallback={<ScreenLoader />}><SmartAiPage /></Suspense>} />
         <Route path="/doctors" element={<Suspense fallback={<ScreenLoader />}><Doctors /></Suspense>} />
-        <Route path="/staff" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute><StaffDashboard /></ProtectedRoute></Suspense>} />
-        <Route path="/receptionist" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute><StaffDashboard initialTab="reception" /></ProtectedRoute></Suspense>} />
-        <Route path="/doctor-dashboard" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute><StaffDashboard initialTab="doctor" /></ProtectedRoute></Suspense>} />
-        <Route path="/pharmacist" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute><StaffDashboard initialTab="pharmacy" /></ProtectedRoute></Suspense>} />
+        <Route path="/staff" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute roles={['admin']}><StaffDashboard /></ProtectedRoute></Suspense>} />
+        <Route path="/receptionist" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute roles={['receptionist', 'admin']}><StaffDashboard initialTab="reception" standalone /></ProtectedRoute></Suspense>} />
+        <Route path="/doctor-dashboard" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute roles={['doctor', 'admin']}><StaffDashboard initialTab="doctor" standalone /></ProtectedRoute></Suspense>} />
+        <Route path="/pharmacist" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute roles={['pharmacist', 'admin']}><StaffDashboard initialTab="pharmacy" standalone /></ProtectedRoute></Suspense>} />
         <Route path="/contact" element={<Suspense fallback={<ScreenLoader />}><Contact /></Suspense>} />
         <Route path="/complete-profile" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute allowIncompleteProfile><CompleteProfilePage /></ProtectedRoute></Suspense>} />
         <Route path="/book" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute><BookingPage /></ProtectedRoute></Suspense>} />

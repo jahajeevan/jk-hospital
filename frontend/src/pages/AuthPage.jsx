@@ -1,17 +1,33 @@
 import { SignIn, SignUp, useClerk, useUser } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
 import { MailCheck, ShieldCheck, Sparkles, UserPlus, Lock } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { authenticateUser, createUserSession } from '../utils/userStore.js';
 
 const perks = [
   { icon: MailCheck, title: 'Email OTP', desc: 'Verified by Clerk' },
   { icon: ShieldCheck, title: 'Secure sessions', desc: 'Persistent login' },
   { icon: Sparkles, title: 'Live tokens', desc: 'Book and pay online' }
 ];
+
+const demoAccounts = [
+  ['Receptionist', 'receptionist@jkhospital.com', 'Reception@123'],
+  ['Pharmacist', 'pharmacist@jkhospital.com', 'Pharmacy@123'],
+  ['Dr Ravi Kumar', 'ravi@jkhospital.com', 'Doctor@123'],
+  ['Dr Priya Sharma', 'priya@jkhospital.com', 'Doctor@123'],
+  ['Dr Arjun Menon', 'arjun@jkhospital.com', 'Doctor@123']
+];
+
+const dashboardForRole = (role) => ({
+  receptionist: '/receptionist',
+  doctor: '/doctor-dashboard',
+  pharmacist: '/pharmacist',
+  admin: '/admin'
+}[role] || '/dashboard');
 
 const clerkAppearance = {
   elements: {
@@ -59,6 +75,7 @@ export default function AuthPage({ mode }) {
   const { isSignedIn } = useUser();
   const { isAdmin, user } = useAuth();
   const handledAdminMismatch = useRef(false);
+  const [localLogin, setLocalLogin] = useState({ email: '', password: '' });
 
   useEffect(() => {
     if (location.state?.adminDenied) {
@@ -86,9 +103,22 @@ export default function AuthPage({ mode }) {
       }
 
       toast.success(isSignup ? 'Signup verified successfully' : 'Login successful');
-      navigate(isAdminLogin ? '/admin' : '/dashboard', { replace: true });
+      navigate(isAdminLogin ? '/admin' : dashboardForRole(user.role), { replace: true });
     }
   }, [isSignedIn, isSignup, isAdminLogin, isAdmin, navigate, signOut, user]);
+
+  const submitLocalLogin = async (event) => {
+    event.preventDefault();
+    try {
+      const account = await authenticateUser(localLogin.email, localLogin.password);
+      const session = await createUserSession(account);
+      window.dispatchEvent(new Event('jk-auth-sync'));
+      toast.success('Login successful');
+      navigate(dashboardForRole(session.user.role), { replace: true });
+    } catch (error) {
+      toast.error(error.message || 'Invalid email or password');
+    }
+  };
 
   return (
     <main className="auth-shell min-h-[calc(100vh-4rem)]">
@@ -163,6 +193,41 @@ export default function AuthPage({ mode }) {
                   />
                 )}
               </div>
+
+              {!isSignup && (
+                <form onSubmit={submitLocalLogin} className="mt-6 rounded-2xl border border-medical-100 bg-white/80 p-4 shadow-sm">
+                  <p className="text-sm font-bold text-ink">Staff/demo email login</p>
+                  <div className="mt-3 grid gap-3">
+                    <input
+                      className="field"
+                      type="email"
+                      placeholder="Email"
+                      value={localLogin.email}
+                      onChange={(event) => setLocalLogin((value) => ({ ...value, email: event.target.value }))}
+                    />
+                    <input
+                      className="field"
+                      type="password"
+                      placeholder="Password"
+                      value={localLogin.password}
+                      onChange={(event) => setLocalLogin((value) => ({ ...value, password: event.target.value }))}
+                    />
+                    <button type="submit" className="btn-primary w-full">Login with email/password</button>
+                  </div>
+                  <div className="mt-3 space-y-1 text-xs text-slate-500">
+                    {demoAccounts.map(([label, email, password]) => (
+                      <button
+                        key={email}
+                        type="button"
+                        onClick={() => setLocalLogin({ email, password })}
+                        className="block text-left font-semibold text-medical-700 hover:underline"
+                      >
+                        {label}: {email} / {password}
+                      </button>
+                    ))}
+                  </div>
+                </form>
+              )}
 
               <p className="mt-6 text-center text-sm text-slate-600">
                 {isAdminLogin ? 'Patient portal?' : isSignup ? 'Already have an account?' : 'New to JK Hospital?'}{' '}

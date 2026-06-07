@@ -29,6 +29,11 @@ let hydrated = false;
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const seededDoctorProfiles = {
+  'doc-vijay': { name: 'Dr Ravi Kumar', email: 'ravi@jkhospital.com', specialization: 'Orthopedics', department: 'Orthopedics' },
+  'doc-jaha': { name: 'Dr Priya Sharma', email: 'priya@jkhospital.com', specialization: 'Pediatrics', department: 'Pediatrics' },
+  'doc-suguna': { name: 'Dr Arjun Menon', email: 'arjun@jkhospital.com', specialization: 'General Medicine', department: 'General Medicine' }
+};
 const isPlaceholderDoctor = (doctor) =>
   doctor?.name === 'Dr. New Doctor' ||
   doctor?.bio === 'Add a short doctor profile for patients.';
@@ -52,11 +57,12 @@ const normalizeSlot = (slot, doctorFee) => ({
 const normalizeDoctor = (doctor) => ({
   ...doctor,
   _id: doctor._id || makeId('doc'),
-  name: doctor.name || 'Unnamed doctor',
+  name: seededDoctorProfiles[doctor._id]?.name || doctor.name || 'Unnamed doctor',
+  email: doctor.email || seededDoctorProfiles[doctor._id]?.email || '',
   specialty: doctor.specialty || doctor.specialization || 'General Physician',
-  specialization: doctor.specialization || doctor.specialty || 'General Physician',
+  specialization: seededDoctorProfiles[doctor._id]?.specialization || doctor.specialization || doctor.specialty || 'General Physician',
   qualification: doctor.qualification || 'MBBS',
-  department: DEPARTMENTS.includes(doctor.department) ? doctor.department : 'General Medicine',
+  department: seededDoctorProfiles[doctor._id]?.department || (DEPARTMENTS.includes(doctor.department) ? doctor.department : 'General Medicine'),
   experience: doctor.experience || '5 years',
   bio: doctor.bio || 'Patient-focused healthcare professional.',
   avatar: doctor.avatar || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80',

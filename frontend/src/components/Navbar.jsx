@@ -55,19 +55,36 @@ export default function Navbar() {
     };
   }, [open]);
 
+  const roleLinks = {
+    receptionist: [
+      ['/receptionist', UserCheck, 'Reception'],
+      ['/book', CalendarCheck, 'Book'],
+      ['/doctors', UsersRound, 'Doctors']
+    ],
+    doctor: [
+      ['/doctor-dashboard', Stethoscope, 'Doctor'],
+      ['/dashboard', LayoutDashboard, 'Patient']
+    ],
+    pharmacist: [
+      ['/pharmacist', Pill, 'Pharmacy'],
+      ['/dashboard', LayoutDashboard, 'Patient']
+    ],
+    admin: [
+      ['/admin', ShieldCheck, 'Admin'],
+      ['/receptionist', UserCheck, 'Reception'],
+      ['/doctor-dashboard', Stethoscope, 'Doctor'],
+      ['/pharmacist', Pill, 'Pharmacy']
+    ],
+    patient: [
+      ['/dashboard', LayoutDashboard, 'Patient'],
+      ['/book', CalendarCheck, 'Book'],
+      ['/ai', Bot, 'AI'],
+      ['/doctors', UsersRound, 'Doctors']
+    ]
+  };
+
   const links = user
-    ? [
-        ['/dashboard', LayoutDashboard, 'Patient'],
-        ['/book', CalendarCheck, 'Book'],
-        ['/receptionist', UserCheck, 'Reception'],
-        ['/doctor-dashboard', Stethoscope, 'Doctor'],
-        ['/pharmacist', Pill, 'Pharmacy'],
-        ['/ai', Bot, 'AI'],
-        ['/doctors', UsersRound, 'Doctors'],
-        ['/contact', Mail, 'Contact'],
-        ['/services', Stethoscope, 'Services'],
-        ...(isAdmin ? [['/admin', ShieldCheck, 'Admin']] : [])
-      ]
+    ? roleLinks[user.role] || roleLinks.patient
     : [
         ['/', Activity, 'Home'],
         ['/ai', Bot, 'AI'],

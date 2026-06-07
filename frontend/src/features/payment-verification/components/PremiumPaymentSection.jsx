@@ -51,6 +51,18 @@ const loadRazorpay = () =>
     document.body.appendChild(script);
   });
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const withRetry = async (fn, retries = 1) => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (!retries) throw error;
+    await wait(1500);
+    return withRetry(fn, retries - 1);
+  }
+};
+
 /**
  * @param {{ booking: object, user: object }} props
  */
@@ -100,7 +112,7 @@ export default function PremiumPaymentSection({ booking, user }) {
   }, [voiceEnabled]);
 
   useEffect(() => {
-    fetchPaymentConfig()
+    withRetry(fetchPaymentConfig, 2)
       .then((config) => {
         const nextProviders = {
           razorpay: Boolean(config.razorpay),
@@ -113,7 +125,7 @@ export default function PremiumPaymentSection({ booking, user }) {
       })
       .catch((error) => {
         setProviders({ razorpay: false, stripe: false });
-        setCheckoutError(formatApiError(error));
+        setCheckoutError(`${formatApiError(error)} The payment server may be waking up. Wait a few seconds and try again.`);
       })
       .finally(() => setConfigLoading(false));
   }, []);
@@ -182,7 +194,7 @@ export default function PremiumPaymentSection({ booking, user }) {
     await audio.prepareAudio();
     try {
       await loadRazorpay();
-      const data = await createRazorpayOrder(buildOrderPayload());
+      const data = await withRetry(() => createRazorpayOrder(buildOrderPayload()), 1);
 
       const checkout = new window.Razorpay({
         key: data.keyId,
@@ -224,7 +236,7 @@ export default function PremiumPaymentSection({ booking, user }) {
       });
       checkout.open();
     } catch (error) {
-      setCheckoutError(error.friendlyMessage || formatApiError(error) || 'Could not start Razorpay. Restart backend and try again.');
+      setCheckoutError(error.friendlyMessage || formatApiError(error) || 'Could not start Razorpay. If the server just woke up, press Pay again after a few seconds.');
       setCheckoutLoading(false);
     }
   };
@@ -274,7 +286,7 @@ export default function PremiumPaymentSection({ booking, user }) {
           </p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">Pay consultation fee</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            Stripe & Razorpay — verified before your token is issued.
+            Razorpay is active for UPI, cards, wallets, and netbanking. If the payment server is waking up, this page retries automatically.
           </p>
 
           <div className="mt-8 rounded-2xl bg-white p-6 shadow-[0_30px_80px_rgba(20,123,209,0.14)] dark:bg-slate-800/80 dark:shadow-none">

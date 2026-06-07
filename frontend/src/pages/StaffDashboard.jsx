@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import MetricCard from '../components/MetricCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import {
   DEPARTMENTS,
   createWalkInBooking,
@@ -28,14 +29,43 @@ const tabs = [
   ['audit', 'Audit']
 ];
 
-const emptyRx = { symptoms: '', diagnosis: '', advice: '', followUpRequired: false, followUpDate: '', followUpNotes: '', remarks: '', medicines: [{ name: '', morning: '', afternoon: '', night: '', days: '' }] };
+const roleMeta = {
+  reception: {
+    badge: 'Receptionist dashboard',
+    title: 'Reception desk',
+    text: 'Verify bookings, filter arrivals by doctor and time, register walk-ins, and move patients into the doctor queue.'
+  },
+  doctor: {
+    badge: 'Doctor dashboard',
+    title: 'Doctor consultation queue',
+    text: 'See only your patients, start consultation, enter symptoms, add medicines, and send prescriptions to pharmacy.'
+  },
+  pharmacy: {
+    badge: 'Pharmacist dashboard',
+    title: 'Pharmacy billing desk',
+    text: 'Receive doctor prescriptions, select dispensed medicines, collect payment, and complete the visit.'
+  },
+  inventory: {
+    badge: 'Inventory',
+    title: 'Medicine inventory',
+    text: 'Maintain medicine stock, batch numbers, expiry dates, and stock alerts.'
+  },
+  audit: {
+    badge: 'Audit',
+    title: 'Activity audit trail',
+    text: 'Review staff actions and workflow events.'
+  }
+};
+
+const emptyRx = { symptoms: '', medicines: [{ name: '', morning: '', afternoon: '', night: '', days: '' }] };
 const emptyMedicine = { name: '', batchNumber: '', expiryDate: '', purchasePrice: '', sellingPrice: '', currentStock: '', minimumStockLevel: '' };
 
 const patientName = (booking) => booking.patientDetails?.name || booking.patientName || 'Patient';
 const patientPhone = (booking) => booking.patientDetails?.phone || booking.patient?.phone || '';
 const statusOpenForReception = new Set(['approved', 'confirmed', 'payment_submitted', 'arrived', 'in_progress', 'prescription_generated', 'pharmacy_pending']);
 
-export default function StaffDashboard({ initialTab = 'reception' }) {
+export default function StaffDashboard({ initialTab = 'reception', standalone = false }) {
+  const { user } = useAuth();
   const [tab, setTab] = useState(initialTab);
   const [bookings, setBookings] = useState(() => getLocalBookings());
   const [doctors, setDoctors] = useState(() => getLocalDoctors());
@@ -47,6 +77,8 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
   const [billBookingId, setBillBookingId] = useState('');
   const [billItems, setBillItems] = useState([{ medicineId: '', name: '', quantity: 1, unitPrice: 0 }]);
   const [medicineForm, setMedicineForm] = useState(emptyMedicine);
+  const [doctorFilter, setDoctorFilter] = useState('');
+  const [timeFilter, setTimeFilter] = useState('');
 
   const reload = () => {
     setBookings(getLocalBookings());
@@ -58,18 +90,31 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
     setTab(initialTab);
   }, [initialTab]);
 
+  const currentDoctor = useMemo(() => {
+    if (user?.role !== 'doctor') return null;
+    return doctors.find((doctor) => doctor.email?.toLowerCase() === user.email?.toLowerCase()) || null;
+  }, [doctors, user]);
+
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
-    if (!value) return bookings;
-    return bookings.filter((booking) =>
+    return bookings.filter((booking) => {
+      if (doctorFilter && booking.doctor?._id !== doctorFilter) return false;
+      if (timeFilter && booking.slotLabel !== timeFilter) return false;
+      if (!value) return true;
+      return (
       [patientName(booking), patientPhone(booking), booking.tokenNumber, booking.doctor?.name, booking.status]
         .filter(Boolean)
         .some((item) => String(item).toLowerCase().includes(value))
-    );
-  }, [bookings, query]);
+      );
+    });
+  }, [bookings, doctorFilter, query, timeFilter]);
 
   const waiting = bookings.filter((item) => ['arrived', 'approved', 'confirmed'].includes(item.status));
-  const activeDoctorQueue = bookings.filter((item) => ['arrived', 'in_progress'].includes(item.status));
+  const activeDoctorQueue = bookings.filter((item) => {
+    if (!['arrived', 'in_progress'].includes(item.status)) return false;
+    if (user?.role !== 'doctor') return true;
+    return Boolean(currentDoctor && item.doctor?._id === currentDoctor._id);
+  });
   const pharmacyQueue = bookings.filter((item) => ['prescription_generated', 'pharmacy_pending'].includes(item.status));
   const completedToday = bookings.filter((item) => item.status === 'completed');
   const alerts = getInventoryAlerts();
@@ -95,13 +140,17 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
   const addRxMedicine = () => setRxForm((value) => ({ ...value, medicines: [...value.medicines, { name: '', morning: '', afternoon: '', night: '', days: '' }] }));
 
   const submitPrescription = () => {
-    if (!rxBookingId || !rxForm.diagnosis.trim()) return toast.error('Select patient and enter diagnosis');
-    savePrescriptionForBooking({ bookingId: rxBookingId, doctorName: 'Doctor', ...rxForm });
+    if (!rxBookingId || !rxForm.symptoms.trim()) return toast.error('Select patient and enter symptoms');
+    savePrescriptionForBooking({ bookingId: rxBookingId, doctorName: currentDoctor?.name || 'Doctor', diagnosis: '', advice: '', followUpRequired: false, followUpDate: '', followUpNotes: '', remarks: '', ...rxForm });
     setRxBookingId('');
     setRxForm(emptyRx);
     reload();
     toast.success('Prescription saved and sent to pharmacy');
   };
+
+  const visibleTabs = standalone ? [] : tabs;
+  const meta = roleMeta[tab] || roleMeta.reception;
+  const slotOptions = Array.from(new Set(bookings.map((item) => item.slotLabel).filter(Boolean)));
 
   const chooseBillMedicine = (index, medicineId) => {
     const medicine = inventory.find((item) => item._id === medicineId);
@@ -130,9 +179,9 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
       <div className="container-pad">
         <section className="patient-hero-panel">
           <div>
-            <span className="live-badge">Staff operations</span>
-            <h1 className="mt-4 text-3xl font-bold sm:text-4xl">JK Hospital workflow desk</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">Reception arrival, doctor consultation, prescription, pharmacy billing, inventory alerts, notifications, and audit trail.</p>
+            <span className="live-badge">{meta.badge}</span>
+            <h1 className="mt-4 text-3xl font-bold sm:text-4xl">{meta.title}</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-600">{meta.text}</p>
           </div>
         </section>
 
@@ -143,11 +192,13 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
           <MetricCard label="Completed visits" value={completedToday.length} tone="rose" />
         </div>
 
+        {visibleTabs.length ? (
         <div className="mt-6 flex flex-wrap gap-2">
-          {tabs.map(([id, label]) => (
+          {visibleTabs.map(([id, label]) => (
             <button key={id} type="button" onClick={() => setTab(id)} className={`tab-pill ${tab === id ? 'tab-pill-active' : 'bg-white ring-1 ring-slate-200'}`}>{label}</button>
           ))}
         </div>
+        ) : null}
 
         {notifications.length ? (
           <section className="patient-panel mt-6 rounded-xl p-4">
@@ -179,6 +230,16 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <h2 className="flex items-center gap-2 text-xl font-bold"><Search size={19} /> Reception queue</h2>
                 <input className="field md:max-w-xs" placeholder="Search name, mobile, token" value={query} onChange={(e) => setQuery(e.target.value)} />
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <select className="field" value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}>
+                  <option value="">All doctors</option>
+                  {doctors.map((doctor) => <option key={doctor._id} value={doctor._id}>{doctor.name}</option>)}
+                </select>
+                <select className="field" value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)}>
+                  <option value="">All booked times</option>
+                  {slotOptions.map((slotLabel) => <option key={slotLabel} value={slotLabel}>{slotLabel}</option>)}
+                </select>
               </div>
               <div className="mt-4 grid gap-3">
                 {filtered.filter((booking) => statusOpenForReception.has(booking.status)).map((booking) => (
@@ -220,16 +281,20 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
                     </div>
                   </article>
                 ))}
+                {!activeDoctorQueue.length && (
+                  <p className="rounded-xl bg-white p-4 text-sm text-slate-500 ring-1 ring-slate-100">
+                    {currentDoctor ? `No arrived patients for ${currentDoctor.name}.` : 'No arrived patients yet.'}
+                  </p>
+                )}
               </div>
             </section>
             <section className="patient-panel rounded-xl p-5">
               <h2 className="flex items-center gap-2 text-xl font-bold"><FileText size={19} /> Prescription form</h2>
               <select className="field mt-4" value={rxBookingId} onChange={(e) => setRxBookingId(e.target.value)}>
                 <option value="">Select current patient</option>
-                {bookings.filter((item) => ['arrived', 'in_progress'].includes(item.status)).map((booking) => <option key={booking._id} value={booking._id}>#{booking.tokenNumber} · {patientName(booking)}</option>)}
+                {activeDoctorQueue.map((booking) => <option key={booking._id} value={booking._id}>#{booking.tokenNumber} · {patientName(booking)}</option>)}
               </select>
-              <textarea className="field mt-3" rows={2} placeholder="Symptoms" value={rxForm.symptoms} onChange={(e) => setRxForm((v) => ({ ...v, symptoms: e.target.value }))} />
-              <textarea className="field mt-3" rows={2} placeholder="Diagnosis" value={rxForm.diagnosis} onChange={(e) => setRxForm((v) => ({ ...v, diagnosis: e.target.value }))} />
+              <textarea className="field mt-3" rows={3} placeholder="Symptoms" value={rxForm.symptoms} onChange={(e) => setRxForm((v) => ({ ...v, symptoms: e.target.value }))} />
               <div className="mt-3 grid gap-2">
                 {rxForm.medicines.map((medicine, index) => (
                   <div key={index} className="grid gap-2 rounded-lg bg-white p-3 ring-1 ring-slate-100 md:grid-cols-5">
@@ -239,10 +304,7 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
                 ))}
                 <button type="button" onClick={addRxMedicine} className="btn-secondary px-3 py-2 text-xs">Add medicine row</button>
               </div>
-              <textarea className="field mt-3" rows={2} placeholder="Advice / remarks" value={rxForm.advice} onChange={(e) => setRxForm((v) => ({ ...v, advice: e.target.value }))} />
-              <label className="mt-3 flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={rxForm.followUpRequired} onChange={(e) => setRxForm((v) => ({ ...v, followUpRequired: e.target.checked }))} /> Follow-up required</label>
-              {rxForm.followUpRequired && <div className="mt-3 grid gap-3 md:grid-cols-2"><input className="field" type="date" value={rxForm.followUpDate} onChange={(e) => setRxForm((v) => ({ ...v, followUpDate: e.target.value }))} /><input className="field" placeholder="Follow-up notes" value={rxForm.followUpNotes} onChange={(e) => setRxForm((v) => ({ ...v, followUpNotes: e.target.value }))} /></div>}
-              <button type="button" onClick={submitPrescription} className="btn-primary mt-4 w-full">Save prescription</button>
+              <button type="button" onClick={submitPrescription} className="btn-primary mt-4 w-full">Save and send to pharmacy</button>
             </section>
           </div>
         )}
@@ -256,13 +318,13 @@ export default function StaffDashboard({ initialTab = 'reception' }) {
             </select>
             <div className="mt-4 grid gap-3">
               {billItems.map((item, index) => (
-                <div key={index} className="grid gap-2 rounded-lg bg-white p-3 ring-1 ring-slate-100 md:grid-cols-[1fr_100px_120px]">
+                <div key={index} className="grid gap-3 rounded-lg bg-white p-4 ring-1 ring-slate-100 md:grid-cols-[1fr_120px_140px]">
                   <select className="field" value={item.medicineId} onChange={(e) => chooseBillMedicine(index, e.target.value)}>
                     <option value="">Select medicine</option>
                     {inventory.map((medicine) => <option key={medicine._id} value={medicine._id}>{medicine.name} · stock {medicine.currentStock}</option>)}
                   </select>
-                  <input className="field" type="number" min="1" value={item.quantity} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => itemIndex === index ? { ...billItem, quantity: e.target.value } : billItem))} />
-                  <input className="field" type="number" min="0" value={item.unitPrice} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => itemIndex === index ? { ...billItem, unitPrice: e.target.value } : billItem))} />
+                  <label className="text-xs font-bold text-slate-500">Qty<input className="field mt-1" type="number" min="1" value={item.quantity} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => itemIndex === index ? { ...billItem, quantity: e.target.value } : billItem))} /></label>
+                  <label className="text-xs font-bold text-slate-500">Unit price<input className="field mt-1" type="number" min="0" value={item.unitPrice} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => itemIndex === index ? { ...billItem, unitPrice: e.target.value } : billItem))} /></label>
                 </div>
               ))}
             </div>

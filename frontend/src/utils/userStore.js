@@ -23,6 +23,13 @@ export const initUserStore = async () => {
 
   const adminPass = import.meta.env.VITE_INITIAL_ADMIN_PASSWORD || 'Admin@12345';
   const patientPass = import.meta.env.VITE_INITIAL_PATIENT_PASSWORD || 'Patient@12345';
+  const staffSeeds = [
+    ['receptionist@jkhospital.com', 'JK Hospital Receptionist', 'Reception@123', 'receptionist'],
+    ['pharmacist@jkhospital.com', 'JK Hospital Pharmacist', 'Pharmacy@123', 'pharmacist'],
+    ['ravi@jkhospital.com', 'Dr Ravi Kumar', 'Doctor@123', 'doctor'],
+    ['priya@jkhospital.com', 'Dr Priya Sharma', 'Doctor@123', 'doctor'],
+    ['arjun@jkhospital.com', 'Dr Arjun Menon', 'Doctor@123', 'doctor']
+  ];
 
   const seeded = await Promise.all([
     {
@@ -38,7 +45,14 @@ export const initUserStore = async () => {
       phone: '7845265507',
       role: 'patient',
       credentials: await hashPassword(patientPass)
-    }
+    },
+    ...staffSeeds.map(async ([email, name, password, role]) => ({
+      email,
+      name,
+      phone: '',
+      role,
+      credentials: await hashPassword(password)
+    }))
   ]);
 
   await secureSet(USERS_KEY, seeded);
