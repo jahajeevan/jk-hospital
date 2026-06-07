@@ -53,7 +53,7 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     const { data: newPayments, error: paymentError } = await supabase
       .from('payments')
       .insert(toSnakeObj({
-        patient: user._id,
+        patientId: user._id,
         amount: paymentInput?.amount || getSlotFee(doctor, slotId),
         method: paymentInput?.method || 'upi',
         upiId: HOSPITAL.upiId,
@@ -72,8 +72,8 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
   const { data: newAppointments, error: appointmentError } = await supabase
     .from('appointments')
     .insert(toSnakeObj({
-      patient: user._id,
-      doctor: doctor._id,
+      patientId: user._id,
+      doctorId: doctor._id,
       appointmentDate: normalizedAppointmentDate.toISOString().slice(0, 10),
       slotId,
       slotLabel: token.slot.label,

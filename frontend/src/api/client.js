@@ -8,7 +8,11 @@ const inferProductionApiUrl = () => {
   return `${protocol}//api.${domain}/api`;
 };
 
-const rawApiUrl = import.meta.env.VITE_API_URL || inferProductionApiUrl();
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const rawApiUrl =
+  configuredApiUrl === '/api' && typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? inferProductionApiUrl()
+    : configuredApiUrl || inferProductionApiUrl();
 const normalizedApiUrl = rawApiUrl === '/api' || rawApiUrl.endsWith('/api')
   ? rawApiUrl
   : `${rawApiUrl.replace(/\/$/, '')}/api`;
