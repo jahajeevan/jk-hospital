@@ -29,6 +29,18 @@ let hydrated = false;
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const todayLocal = () => {
+  const value = new Date();
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+  return value.toISOString().slice(0, 10);
+};
+const isSlotEndedForDate = (slot, date, now = new Date()) => {
+  if (date !== todayLocal() || !slot?.endTime) return false;
+  const [hours, minutes] = slot.endTime.split(':').map(Number);
+  const end = new Date(now);
+  end.setHours(hours || 0, minutes || 0, 0, 0);
+  return now > end;
+};
 const seededDoctorProfiles = {
   'doc-vijay': { name: 'Dr Ravi Kumar', email: 'ravi@jkhospital.com', specialization: 'Orthopedics', department: 'Orthopedics' },
   'doc-jaha': { name: 'Dr Priya Sharma', email: 'priya@jkhospital.com', specialization: 'Pediatrics', department: 'Pediatrics' },
@@ -46,6 +58,8 @@ const normalizeSlot = (slot, doctorFee) => ({
   endTime: slot.endTime || '10:00',
   tokenLimit: Math.max(Number(slot.tokenLimit ?? 10), 0),
   bookedTokens: Math.min(Math.max(Number(slot.bookedTokens ?? 0), 0), Math.max(Number(slot.tokenLimit ?? 10), 0)),
+  walkInTokenLimit: Math.max(Number(slot.walkInTokenLimit ?? 50), 0),
+  walkInBookedTokens: Math.min(Math.max(Number(slot.walkInBookedTokens ?? 0), 0), Math.max(Number(slot.walkInTokenLimit ?? 50), 0)),
   fee: normalizeFee(slot.fee, doctorFee),
   isActive: slot.isActive ?? true,
   date: slot.date || '',
@@ -197,6 +211,7 @@ export const createLocalSlot = (doctorId, slotInput) =>
     _id: makeId('slot'),
     ...slotInput,
     bookedTokens: 0,
+    walkInBookedTokens: 0
   });
 
 const normalizeBookingDate = (date) => {
@@ -415,26 +430,53 @@ export const markPatientArrived = (id, receptionistName = 'Receptionist') =>
     extra: { arrivalTime: new Date().toISOString(), receptionistId: receptionistName }
   });
 
-export const createWalkInBooking = ({ patientName, mobile, doctorId, department, receptionistName = 'Receptionist' }) => {
+export const getWalkInSlotAvailability = (doctor, slotId, date = todayLocal(), now = new Date()) => {
+  const slot = doctor?.slots?.find((item) => item._id === slotId);
+  if (!slot || slot.isActive === false || !doctor?.isAvailable) {
+    return { slot, booked: 0, remaining: 0, isFull: true, isOver: false, isBookable: false, reasons: ['Slot is unavailable'] };
+  }
+  if (slot.date && slot.date !== date) {
+    return { slot, booked: 0, remaining: 0, isFull: true, isOver: false, isBookable: false, reasons: ['Slot is not active on this date'] };
+  }
+  if (slot.availableFrom && date < slot.availableFrom) {
+    return { slot, booked: 0, remaining: 0, isFull: true, isOver: false, isBookable: false, reasons: ['Slot is not open for this date'] };
+  }
+  if (slot.availableUntil && date > slot.availableUntil) {
+    return { slot, booked: 0, remaining: 0, isFull: true, isOver: false, isBookable: false, reasons: ['Slot is closed for this date'] };
+  }
+  const booked = Math.max(Number(slot.walkInBookedTokens || 0), 0);
+  const limit = Math.max(Number(slot.walkInTokenLimit ?? 50), 0);
+  const remaining = Math.max(limit - booked, 0);
+  const isFull = remaining <= 0;
+  const isOver = isSlotEndedForDate(slot, date, now);
+  const reasons = [
+    ...(isFull ? ['Walk-in tokens are full'] : []),
+    ...(isOver ? ['Slot time is over'] : [])
+  ];
+  return { slot, booked, remaining, isFull, isOver, isBookable: !isFull && !isOver, reasons };
+};
+
+export const getWalkInSlotOptions = (doctor, date = todayLocal()) =>
+  (doctor?.slots || [])
+    .filter((slot) => slot.isActive !== false && (!slot.date || slot.date === date))
+    .map((slot) => getWalkInSlotAvailability(doctor, slot._id, date));
+
+export const createWalkInBooking = ({ patientName, mobile, doctorId, department, date = todayLocal(), slotId, receptionistName = 'Receptionist' }) => {
   const doctor = getLocalDoctors().find((item) => item._id === doctorId && item.department === department);
   if (!doctor) throw new Error('Select a doctor in the chosen department');
-  const activeSlot = doctor.slots.find((item) => item.isActive !== false) || {
-    _id: makeId('walkin-slot'),
-    label: 'Walk-in OP',
-    startTime: new Date().toTimeString().slice(0, 5),
-    endTime: '23:59',
-    tokenLimit: 999,
-    bookedTokens: 0,
-    fee: doctor.fee
-  };
+  const availability = getWalkInSlotAvailability(doctor, slotId, date);
+  if (!availability.slot) throw new Error('Select a walk-in slot');
+  if (!availability.isBookable) throw new Error(availability.reasons.join(', ') || 'This walk-in slot is not available');
+  const activeSlot = availability.slot;
   const doctors = getLocalDoctors();
   const doctorIndex = doctors.findIndex((item) => item._id === doctor._id);
   const slotIndex = doctors[doctorIndex]?.slots.findIndex((item) => item._id === activeSlot._id);
-  const tokenNumber = (activeSlot.bookedTokens || 0) + 1;
+  const tokenNumber = (activeSlot.walkInBookedTokens || 0) + 1;
   if (slotIndex >= 0) {
-    doctors[doctorIndex].slots[slotIndex].bookedTokens = tokenNumber;
+    doctors[doctorIndex].slots[slotIndex].walkInBookedTokens = tokenNumber;
     saveLocalDoctors(doctors);
   }
+  const appointmentDate = new Date(`${date}T${activeSlot.startTime || '00:00'}:00`).toISOString();
   const booking = {
     _id: `WALK-${Date.now()}`,
     patientId: `WALK-${String(Date.now()).slice(-6)}`,
@@ -443,7 +485,7 @@ export const createWalkInBooking = ({ patientName, mobile, doctorId, department,
     doctor,
     slotId: activeSlot._id,
     slotLabel: activeSlot.label,
-    appointmentDate: new Date().toISOString(),
+    appointmentDate,
     tokenNumber,
     requestedPosition: tokenNumber,
     queuePosition: tokenNumber,
@@ -497,7 +539,7 @@ export const getLocalMedicalRecords = () => JSON.parse(localStorage.getItem(MEDI
 export const getLocalMedicalRecordsForUser = (email) =>
   getLocalMedicalRecords().filter((item) => normalizeEmail(item.email) === normalizeEmail(email));
 
-export const saveLocalMedicalRecord = ({ email, type, title, sourceText, aiSummary }) => {
+export const saveLocalMedicalRecord = ({ email, type, title, sourceText, aiSummary, ...extra }) => {
   const records = getLocalMedicalRecords();
   const entry = {
     _id: `REC-${Date.now()}`,
@@ -506,6 +548,7 @@ export const saveLocalMedicalRecord = ({ email, type, title, sourceText, aiSumma
     title: title || 'AI medical summary',
     sourceText,
     aiSummary,
+    ...extra,
     createdAt: new Date().toISOString()
   };
   localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify([entry, ...records]));
@@ -583,13 +626,17 @@ export const savePharmacyBillForBooking = ({ bookingId, pharmacistName = 'Pharma
   const inventory = getLocalInventory();
   const billItems = items
     .filter((item) => item.name?.trim() && Number(item.quantity) > 0)
-    .map((item) => ({
-      medicineId: item.medicineId || '',
-      name: item.name,
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice || 0),
-      total: Number(item.quantity) * Number(item.unitPrice || 0)
-    }));
+    .map((item) => {
+      const quantity = Number(item.quantity);
+      const total = Number(item.totalCost ?? (quantity * Number(item.unitPrice || 0)));
+      return {
+        medicineId: item.medicineId || '',
+        name: item.name,
+        quantity,
+        unitPrice: quantity > 0 ? total / quantity : total,
+        total
+      };
+    });
   const totalAmount = billItems.reduce((sum, item) => sum + item.total, 0);
   const nextInventory = inventory.map((medicine) => {
     const sold = billItems.filter((item) => item.medicineId === medicine._id).reduce((sum, item) => sum + item.quantity, 0);
@@ -625,19 +672,28 @@ export const savePharmacyBillForBooking = ({ bookingId, pharmacistName = 'Pharma
   });
   const recordText = [
     `Doctor: ${booking?.doctor?.name || ''}`,
-    `Diagnosis: ${booking?.prescription?.diagnosis || ''}`,
-    `Prescription: ${(booking?.prescription?.medicines || []).map((item) => `${item.name} ${item.days || ''} days`).join(', ')}`,
-    `Medicines dispensed: ${billItems.map((item) => `${item.name} x${item.quantity}`).join(', ')}`,
+    `Symptoms: ${booking?.prescription?.symptoms || ''}`,
+    `Prescription: ${(booking?.prescription?.medicines || []).map((item) => `${item.name} · M:${item.morning || '-'} A:${item.afternoon || '-'} N:${item.night || '-'} · ${item.days || '-'} days`).join(', ')}`,
+    `Medicines dispensed: ${billItems.map((item) => `${item.name} x${item.quantity} = INR ${item.total}`).join(', ')}`,
     `Bill amount: INR ${totalAmount}`,
-    `Payment: ${paymentMethod}`,
-    `Follow-up: ${booking?.prescription?.followUpRequired ? `${booking.prescription.followUpDate} - ${booking.prescription.followUpNotes}` : 'Not required'}`
+    `Payment: ${paymentMethod}`
   ].join('\n');
   saveLocalMedicalRecord({
     email: booking?.patientEmail,
     type: 'visit-summary',
-    title: `Visit summary · token #${booking?.tokenNumber || ''}`,
+    title: `Prescription and bill · token #${booking?.tokenNumber || ''}`,
     sourceText: recordText,
-    aiSummary: recordText
+    aiSummary: recordText,
+    pdfReady: true,
+    prescription: booking?.prescription,
+    pharmacyBill,
+    appointment: {
+      tokenNumber: booking?.tokenNumber,
+      appointmentDate: booking?.appointmentDate,
+      doctor: booking?.doctor,
+      patientDetails: booking?.patientDetails,
+      patientName: booking?.patientName
+    }
   });
   addLocalNotification({ email: booking?.patientEmail, title: 'Payment completed', message: `Bill ${pharmacyBill.billNumber} paid. Visit record saved.`, type: 'success' });
   return booking;

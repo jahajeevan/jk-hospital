@@ -8,7 +8,7 @@ import { LiquidButton } from './ui/liquid-glass-button';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -57,17 +57,13 @@ export default function Navbar() {
 
   const roleLinks = {
     receptionist: [
-      ['/receptionist', UserCheck, 'Reception'],
-      ['/book', CalendarCheck, 'Book'],
-      ['/doctors', UsersRound, 'Doctors']
+      ['/receptionist', UserCheck, 'Reception']
     ],
     doctor: [
-      ['/doctor-dashboard', Stethoscope, 'Doctor'],
-      ['/dashboard', LayoutDashboard, 'Patient']
+      ['/doctor-dashboard', Stethoscope, 'Doctor']
     ],
     pharmacist: [
-      ['/pharmacist', Pill, 'Pharmacy'],
-      ['/dashboard', LayoutDashboard, 'Patient']
+      ['/pharmacist', Pill, 'Pharmacy']
     ],
     admin: [
       ['/admin', ShieldCheck, 'Admin'],

@@ -36,6 +36,7 @@ const defaultSlotForm = {
   startTime: '',
   endTime: '',
   tokenLimit: '',
+  walkInTokenLimit: 50,
   fee: 500,
   advanceBookingMinutes: 60,
   isActive: true
@@ -229,7 +230,7 @@ export default function AdminDashboard() {
     const doctor = doctorList.find((item) => item._id === doctorId);
     const current = doctor?.slots.find((slot) => slot._id === slotId);
     if (!doctor || !current) return;
-    const numericFields = ['fee', 'tokenLimit', 'bookedTokens', 'advanceBookingMinutes'];
+    const numericFields = ['fee', 'tokenLimit', 'bookedTokens', 'walkInTokenLimit', 'walkInBookedTokens', 'advanceBookingMinutes'];
     const nextValue = numericFields.includes(field) ? Math.max(Number(value), 0) : value;
     const nextSlot = {
       ...current,
@@ -237,6 +238,9 @@ export default function AdminDashboard() {
     };
     if (field === 'tokenLimit') {
       nextSlot.bookedTokens = Math.min(nextSlot.bookedTokens || 0, nextSlot.tokenLimit);
+    }
+    if (field === 'walkInTokenLimit') {
+      nextSlot.walkInBookedTokens = Math.min(nextSlot.walkInBookedTokens || 0, nextSlot.walkInTokenLimit);
     }
     const nextDoctor = saveLocalSlot(doctorId, nextSlot);
     setDoctorList(getLocalDoctors());
@@ -315,6 +319,7 @@ export default function AdminDashboard() {
     if (!slotForm.startTime || !slotForm.endTime) return 'Start and end time are required';
     if (!isTimeBefore(slotForm.startTime, slotForm.endTime)) return 'Slot end time must be after start time';
     if (!isPositiveInteger(slotForm.tokenLimit)) return 'Total slots must be a positive number';
+    if (!isNonNegativeInteger(slotForm.walkInTokenLimit)) return 'Walk-in tokens must be zero or more';
     if (normalizeFee(slotForm.fee) < MIN_CONSULTATION_FEE) return `Slot fee must be at least INR ${MIN_CONSULTATION_FEE}`;
     if (!isNonNegativeInteger(slotForm.advanceBookingMinutes)) return 'Book-before minutes must be zero or more';
     if (slotForm.availableFrom && slotForm.availableUntil && slotForm.availableFrom > slotForm.availableUntil) {
@@ -335,6 +340,7 @@ export default function AdminDashboard() {
       startTime: slotForm.startTime,
       endTime: slotForm.endTime,
       tokenLimit: Number(slotForm.tokenLimit),
+      walkInTokenLimit: Number(slotForm.walkInTokenLimit),
       fee: normalizeFee(slotForm.fee),
       advanceBookingMinutes: Number(slotForm.advanceBookingMinutes),
       isActive: slotForm.isActive
@@ -561,6 +567,8 @@ export default function AdminDashboard() {
                     const booked = slot.bookedTokens || 0;
                     const total = slot.tokenLimit || 0;
                     const remaining = Math.max(total - booked, 0);
+                    const walkInBooked = slot.walkInBookedTokens || 0;
+                    const walkInTotal = slot.walkInTokenLimit ?? 50;
                     return (
                       <div key={slot._id} className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm">
                         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -581,7 +589,7 @@ export default function AdminDashboard() {
                             <input className="field mt-1 px-2 py-1.5" type="date" value={slot.availableUntil || ''} onChange={(event) => updateSlot(doctor._id, slot._id, 'availableUntil', event.target.value)} />
                           </label>
                         </div>
-                        <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
+                        <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-9">
                         <label className="text-xs font-bold text-slate-500">
                           Start
                           <input className="field mt-1 px-2 py-1.5" type="time" value={slot.startTime} onChange={(event) => updateSlot(doctor._id, slot._id, 'startTime', event.target.value)} />
@@ -601,6 +609,14 @@ export default function AdminDashboard() {
                         <label className="text-xs font-bold text-slate-500">
                           Remaining
                           <input className="field mt-1 px-2 py-1.5" type="number" value={remaining} onChange={(event) => updateRemaining(doctor._id, slot._id, event.target.value)} />
+                        </label>
+                        <label className="text-xs font-bold text-slate-500">
+                          Walk-in tokens
+                          <input className="field mt-1 px-2 py-1.5" type="number" min="0" value={walkInTotal} onChange={(event) => updateSlot(doctor._id, slot._id, 'walkInTokenLimit', event.target.value)} />
+                        </label>
+                        <label className="text-xs font-bold text-slate-500">
+                          Walk-ins booked
+                          <input className="field mt-1 px-2 py-1.5" type="number" min="0" value={walkInBooked} onChange={(event) => updateSlot(doctor._id, slot._id, 'walkInBookedTokens', event.target.value)} />
                         </label>
                         <label className="text-xs font-bold text-slate-500">
                           Fee
@@ -879,6 +895,10 @@ export default function AdminDashboard() {
             <label className="text-xs font-bold text-slate-500">
               Total tokens
               <input className="field mt-1" required type="number" min="1" value={slotForm.tokenLimit} onChange={(event) => setSlotForm((value) => ({ ...value, tokenLimit: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Walk-in tokens
+              <input className="field mt-1" required type="number" min="0" value={slotForm.walkInTokenLimit} onChange={(event) => setSlotForm((value) => ({ ...value, walkInTokenLimit: event.target.value }))} />
             </label>
             <label className="text-xs font-bold text-slate-500">
               Slot fee

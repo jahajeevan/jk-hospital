@@ -252,7 +252,7 @@ export default function Dashboard() {
                         <p className="text-wrap-anywhere font-bold text-ink">{record.title}</p>
                         <p className="text-wrap-anywhere text-xs capitalize text-slate-500">{record.type} · {new Date(record.createdAt).toLocaleString()}</p>
                       </div>
-                      <span className="rounded-full bg-medical-50 px-3 py-1 text-xs font-bold text-medical-700">Saved</span>
+                      <span className="rounded-full bg-medical-50 px-3 py-1 text-xs font-bold text-medical-700">{record.pdfReady ? 'PDF ready' : 'Saved'}</span>
                     </div>
                     <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
                       <p className="whitespace-pre-wrap text-wrap-anywhere">{record.aiSummary || record.sourceText || 'No details saved.'}</p>

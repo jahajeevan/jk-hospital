@@ -7,6 +7,14 @@ const SESSION_KEY = 'jk_session';
 let usersCache = null;
 
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const staffSeedAccounts = [
+  ['admin@jkhospital.com', 'JK Hospital Admin', 'Admin@123', 'admin'],
+  ['receptionist@jkhospital.com', 'JK Hospital Receptionist', 'Reception@123', 'receptionist'],
+  ['pharmacist@jkhospital.com', 'JK Hospital Pharmacist', 'Pharmacy@123', 'pharmacist'],
+  ['ravi@jkhospital.com', 'Dr Ravi Kumar', 'Doctor@123', 'doctor'],
+  ['priya@jkhospital.com', 'Dr Priya Sharma', 'Doctor@123', 'doctor'],
+  ['arjun@jkhospital.com', 'Dr Arjun Menon', 'Doctor@123', 'doctor']
+];
 
 const invalidateUsersCache = () => {
   usersCache = null;
@@ -17,19 +25,26 @@ export const initUserStore = async () => {
   await migratePlainKey('jk_local_users');
   const users = await secureGet(USERS_KEY, []);
   if (users.length) {
-    usersCache = users;
-    return users;
+    const missingSeeds = staffSeedAccounts.filter(([email]) => !users.some((item) => normalizeEmail(item.email) === normalizeEmail(email)));
+    const nextUsers = missingSeeds.length
+      ? [
+          ...users,
+          ...(await Promise.all(missingSeeds.map(async ([email, name, password, role]) => ({
+            email,
+            name,
+            phone: '',
+            role,
+            credentials: await hashPassword(password)
+          }))))
+        ]
+      : users;
+    if (missingSeeds.length) await secureSet(USERS_KEY, nextUsers);
+    usersCache = nextUsers;
+    return nextUsers;
   }
 
   const adminPass = import.meta.env.VITE_INITIAL_ADMIN_PASSWORD || 'Admin@12345';
   const patientPass = import.meta.env.VITE_INITIAL_PATIENT_PASSWORD || 'Patient@12345';
-  const staffSeeds = [
-    ['receptionist@jkhospital.com', 'JK Hospital Receptionist', 'Reception@123', 'receptionist'],
-    ['pharmacist@jkhospital.com', 'JK Hospital Pharmacist', 'Pharmacy@123', 'pharmacist'],
-    ['ravi@jkhospital.com', 'Dr Ravi Kumar', 'Doctor@123', 'doctor'],
-    ['priya@jkhospital.com', 'Dr Priya Sharma', 'Doctor@123', 'doctor'],
-    ['arjun@jkhospital.com', 'Dr Arjun Menon', 'Doctor@123', 'doctor']
-  ];
 
   const seeded = await Promise.all([
     {
@@ -46,7 +61,7 @@ export const initUserStore = async () => {
       role: 'patient',
       credentials: await hashPassword(patientPass)
     },
-    ...staffSeeds.map(async ([email, name, password, role]) => ({
+    ...staffSeedAccounts.map(async ([email, name, password, role]) => ({
       email,
       name,
       phone: '',

@@ -13,6 +13,7 @@ import {
   getLocalDoctors,
   getLocalInventory,
   getLocalNotifications,
+  getWalkInSlotOptions,
   markPatientArrived,
   removeLocalMedicine,
   saveLocalMedicine,
@@ -59,6 +60,11 @@ const roleMeta = {
 
 const emptyRx = { symptoms: '', medicines: [{ name: '', morning: '', afternoon: '', night: '', days: '' }] };
 const emptyMedicine = { name: '', batchNumber: '', expiryDate: '', purchasePrice: '', sellingPrice: '', currentStock: '', minimumStockLevel: '' };
+const todayLocal = () => {
+  const value = new Date();
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+  return value.toISOString().slice(0, 10);
+};
 
 const patientName = (booking) => booking.patientDetails?.name || booking.patientName || 'Patient';
 const patientPhone = (booking) => booking.patientDetails?.phone || booking.patient?.phone || '';
@@ -71,11 +77,12 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const [doctors, setDoctors] = useState(() => getLocalDoctors());
   const [inventory, setInventory] = useState(() => getLocalInventory());
   const [query, setQuery] = useState('');
-  const [walkIn, setWalkIn] = useState({ patientName: '', mobile: '', department: DEPARTMENTS[0], doctorId: '' });
+  const [staffSection, setStaffSection] = useState('dashboard');
+  const [walkIn, setWalkIn] = useState({ patientName: '', mobile: '', department: DEPARTMENTS[0], doctorId: '', date: todayLocal(), slotId: '' });
   const [rxBookingId, setRxBookingId] = useState('');
   const [rxForm, setRxForm] = useState(emptyRx);
   const [billBookingId, setBillBookingId] = useState('');
-  const [billItems, setBillItems] = useState([{ medicineId: '', name: '', quantity: 1, unitPrice: 0 }]);
+  const [billItems, setBillItems] = useState([{ medicineId: '', name: '', quantity: 1, totalCost: 0 }]);
   const [medicineForm, setMedicineForm] = useState(emptyMedicine);
   const [doctorFilter, setDoctorFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
@@ -88,6 +95,7 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
 
   useEffect(() => {
     setTab(initialTab);
+    setStaffSection('dashboard');
   }, [initialTab]);
 
   const currentDoctor = useMemo(() => {
@@ -119,16 +127,23 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const completedToday = bookings.filter((item) => item.status === 'completed');
   const alerts = getInventoryAlerts();
   const notifications = getLocalNotifications({ role: tab === 'pharmacy' ? 'pharmacist' : tab });
+  const selectedWalkInDoctor = doctors.find((doctor) => doctor._id === walkIn.doctorId) || null;
+  const walkInSlotOptions = selectedWalkInDoctor ? getWalkInSlotOptions(selectedWalkInDoctor, walkIn.date) : [];
+  const selectedBillBooking = bookings.find((booking) => booking._id === billBookingId);
 
   const submitWalkIn = () => {
-    if (!walkIn.patientName.trim() || walkIn.mobile.length !== 10 || !walkIn.doctorId) {
-      toast.error('Enter patient name, 10-digit mobile, and doctor');
+    if (!walkIn.patientName.trim() || walkIn.mobile.length !== 10 || !walkIn.doctorId || !walkIn.slotId) {
+      toast.error('Enter patient name, 10-digit mobile, doctor, and slot');
       return;
     }
-    createWalkInBooking(walkIn);
-    setWalkIn({ patientName: '', mobile: '', department: DEPARTMENTS[0], doctorId: '' });
-    reload();
-    toast.success('Walk-in registered and marked arrived');
+    try {
+      createWalkInBooking(walkIn);
+      setWalkIn({ patientName: '', mobile: '', department: DEPARTMENTS[0], doctorId: '', date: todayLocal(), slotId: '' });
+      reload();
+      toast.success('Walk-in registered and marked arrived');
+    } catch (error) {
+      toast.error(error.message || 'Walk-in slot is not available');
+    }
   };
 
   const updateStatus = (id, status, role, note = '') => {
@@ -154,14 +169,14 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
 
   const chooseBillMedicine = (index, medicineId) => {
     const medicine = inventory.find((item) => item._id === medicineId);
-    setBillItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, medicineId, name: medicine?.name || '', unitPrice: medicine?.sellingPrice || 0 } : item));
+    setBillItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, medicineId, name: medicine?.name || '', totalCost: Number(medicine?.sellingPrice || 0) * Number(item.quantity || 1) } : item));
   };
 
   const submitBill = () => {
     if (!billBookingId || !billItems.some((item) => item.name && Number(item.quantity) > 0)) return toast.error('Select prescription and add medicines');
     savePharmacyBillForBooking({ bookingId: billBookingId, items: billItems, paymentMethod: 'Cash' });
     setBillBookingId('');
-    setBillItems([{ medicineId: '', name: '', quantity: 1, unitPrice: 0 }]);
+    setBillItems([{ medicineId: '', name: '', quantity: 1, totalCost: 0 }]);
     reload();
     toast.success('Bill paid, inventory updated, visit summary saved');
   };
@@ -200,7 +215,18 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
         </div>
         ) : null}
 
-        {notifications.length ? (
+        {standalone ? (
+          <div className="mt-6 flex flex-wrap gap-2">
+            {[
+              ['dashboard', 'Dashboard'],
+              ['notifications', `Notifications${notifications.length ? ` (${notifications.length})` : ''}`]
+            ].map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setStaffSection(id)} className={`tab-pill ${staffSection === id ? 'tab-pill-active' : 'bg-white ring-1 ring-slate-200'}`}>{label}</button>
+            ))}
+          </div>
+        ) : null}
+
+        {notifications.length && (!standalone || staffSection === 'notifications') ? (
           <section className="patient-panel mt-6 rounded-xl p-4">
             <div className="flex items-center gap-2 font-bold"><Bell size={18} className="text-medical-600" /> Notifications</div>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -209,20 +235,54 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
           </section>
         ) : null}
 
-        {tab === 'reception' && (
+        {standalone && staffSection === 'notifications' && !notifications.length ? (
+          <section className="patient-panel mt-6 rounded-xl p-4 text-sm text-slate-500">
+            No notifications for this dashboard yet.
+          </section>
+        ) : null}
+
+        {(!standalone || staffSection === 'dashboard') && tab === 'reception' && (
           <div className="mt-8 grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-            <section className="patient-panel rounded-xl p-5">
-              <h2 className="flex items-center gap-2 text-xl font-bold"><Plus size={19} /> Walk-in patient</h2>
+            <section className="patient-panel overflow-hidden rounded-xl p-5">
+              <div className="-m-5 mb-5 bg-gradient-to-br from-medical-600 via-blue-500 to-emerald-400 p-5 text-white">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/75">Walk-in desk</p>
+                <h2 className="mt-2 flex items-center gap-2 text-2xl font-bold"><Plus size={20} /> Create walk-in token</h2>
+                <p className="mt-2 text-sm text-white/80">Pick the doctor and live slot. Full or finished slots are locked automatically.</p>
+              </div>
               <div className="mt-4 grid gap-3">
                 <input className="field" placeholder="Patient name" value={walkIn.patientName} onChange={(e) => setWalkIn((v) => ({ ...v, patientName: e.target.value }))} />
                 <input className="field" inputMode="numeric" maxLength={10} placeholder="Mobile number" value={walkIn.mobile} onChange={(e) => setWalkIn((v) => ({ ...v, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))} />
-                <select className="field" value={walkIn.department} onChange={(e) => setWalkIn((v) => ({ ...v, department: e.target.value, doctorId: '' }))}>
+                <select className="field" value={walkIn.department} onChange={(e) => setWalkIn((v) => ({ ...v, department: e.target.value, doctorId: '', slotId: '' }))}>
                   {DEPARTMENTS.map((item) => <option key={item}>{item}</option>)}
                 </select>
-                <select className="field" value={walkIn.doctorId} onChange={(e) => setWalkIn((v) => ({ ...v, doctorId: e.target.value }))}>
+                <select className="field" value={walkIn.doctorId} onChange={(e) => setWalkIn((v) => ({ ...v, doctorId: e.target.value, slotId: '' }))}>
                   <option value="">Select doctor</option>
                   {doctors.filter((doctor) => doctor.department === walkIn.department).map((doctor) => <option key={doctor._id} value={doctor._id}>{doctor.name}</option>)}
                 </select>
+                <input className="field" type="date" min={todayLocal()} value={walkIn.date} onChange={(e) => setWalkIn((v) => ({ ...v, date: e.target.value, slotId: '' }))} />
+                <div className="grid gap-2">
+                  {walkInSlotOptions.map(({ slot, remaining, booked, isBookable, reasons }) => (
+                    <button
+                      key={slot._id}
+                      type="button"
+                      disabled={!isBookable}
+                      onClick={() => setWalkIn((value) => ({ ...value, slotId: slot._id }))}
+                      className={`rounded-2xl border p-4 text-left transition ${walkIn.slotId === slot._id ? 'border-medical-500 bg-medical-50 shadow-lg' : 'border-white/80 bg-white/85'} ${!isBookable ? 'cursor-not-allowed opacity-55' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-ink">{slot.label}</p>
+                          <p className="text-xs text-slate-500">{slot.startTime} - {slot.endTime}</p>
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-xs font-bold ${isBookable ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                          {isBookable ? `${remaining} left` : reasons[0]}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">Walk-ins booked {booked}/{slot.walkInTokenLimit ?? 50}</p>
+                    </button>
+                  ))}
+                  {walkIn.doctorId && !walkInSlotOptions.length ? <p className="rounded-xl bg-white p-3 text-sm text-slate-500 ring-1 ring-slate-100">No active walk-in slots for this doctor and date.</p> : null}
+                </div>
                 <button type="button" onClick={submitWalkIn} className="btn-primary w-full">Create arrived token</button>
               </div>
             </section>
@@ -264,7 +324,7 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
           </div>
         )}
 
-        {tab === 'doctor' && (
+        {(!standalone || staffSection === 'dashboard') && tab === 'doctor' && (
           <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
             <section className="patient-panel rounded-xl p-5">
               <h2 className="flex items-center gap-2 text-xl font-bold"><Stethoscope size={19} /> Waiting queue</h2>
@@ -309,13 +369,38 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
           </div>
         )}
 
-        {tab === 'pharmacy' && (
+        {(!standalone || staffSection === 'dashboard') && tab === 'pharmacy' && (
           <section className="patient-panel mt-8 rounded-xl p-5">
             <h2 className="flex items-center gap-2 text-xl font-bold"><ReceiptText size={19} /> Pharmacy billing</h2>
             <select className="field mt-4" value={billBookingId} onChange={(e) => setBillBookingId(e.target.value)}>
               <option value="">Select prescription</option>
               {pharmacyQueue.map((booking) => <option key={booking._id} value={booking._id}>#{booking.tokenNumber} · {patientName(booking)} · {booking.doctor?.name}</option>)}
             </select>
+            {selectedBillBooking?.prescription ? (
+              <div className="mt-4 rounded-2xl border border-medical-100 bg-medical-50/80 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-medical-700">Doctor prescription</p>
+                    <h3 className="mt-1 text-lg font-bold text-ink">#{selectedBillBooking.tokenNumber} · {patientName(selectedBillBooking)}</h3>
+                    <p className="text-sm text-slate-600">{selectedBillBooking.doctor?.name}</p>
+                  </div>
+                  <StatusBadge status={selectedBillBooking.status} />
+                </div>
+                <p className="mt-3 rounded-xl bg-white p-3 text-sm text-slate-700 ring-1 ring-white/80">
+                  <strong>Symptoms:</strong> {selectedBillBooking.prescription.symptoms || 'Not entered'}
+                </p>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {(selectedBillBooking.prescription.medicines || []).map((medicine, index) => (
+                    <div key={`${medicine.name}-${index}`} className="rounded-xl bg-white p-3 text-sm ring-1 ring-white/80">
+                      <p className="font-bold text-ink">{medicine.name}</p>
+                      <p className="text-slate-500">Morning {medicine.morning || '-'} · Afternoon {medicine.afternoon || '-'} · Night {medicine.night || '-'} · {medicine.days || '-'} days</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : billBookingId ? (
+              <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">No prescription details found for this patient.</p>
+            ) : null}
             <div className="mt-4 grid gap-3">
               {billItems.map((item, index) => (
                 <div key={index} className="grid gap-3 rounded-lg bg-white p-4 ring-1 ring-slate-100 md:grid-cols-[1fr_120px_140px]">
@@ -323,13 +408,18 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
                     <option value="">Select medicine</option>
                     {inventory.map((medicine) => <option key={medicine._id} value={medicine._id}>{medicine.name} · stock {medicine.currentStock}</option>)}
                   </select>
-                  <label className="text-xs font-bold text-slate-500">Qty<input className="field mt-1" type="number" min="1" value={item.quantity} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => itemIndex === index ? { ...billItem, quantity: e.target.value } : billItem))} /></label>
-                  <label className="text-xs font-bold text-slate-500">Unit price<input className="field mt-1" type="number" min="0" value={item.unitPrice} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => itemIndex === index ? { ...billItem, unitPrice: e.target.value } : billItem))} /></label>
+                  <label className="text-xs font-bold text-slate-500">Qty<input className="field mt-1" type="number" min="1" value={item.quantity} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => {
+                    if (itemIndex !== index) return billItem;
+                    const medicine = inventory.find((stockItem) => stockItem._id === billItem.medicineId);
+                    const quantity = e.target.value;
+                    return { ...billItem, quantity, totalCost: medicine ? Number(medicine.sellingPrice || 0) * Number(quantity || 1) : billItem.totalCost };
+                  }))} /></label>
+                  <label className="text-xs font-bold text-slate-500">Total cost<input className="field mt-1" type="number" min="0" value={item.totalCost} onChange={(e) => setBillItems((items) => items.map((billItem, itemIndex) => itemIndex === index ? { ...billItem, totalCost: e.target.value } : billItem))} /></label>
                 </div>
               ))}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <button className="btn-secondary px-3 py-2" type="button" onClick={() => setBillItems((items) => [...items, { medicineId: '', name: '', quantity: 1, unitPrice: 0 }])}>Add item</button>
+              <button className="btn-secondary px-3 py-2" type="button" onClick={() => setBillItems((items) => [...items, { medicineId: '', name: '', quantity: 1, totalCost: 0 }])}>Add item</button>
               <button className="btn-primary px-3 py-2" type="button" onClick={submitBill}>Mark paid and complete visit</button>
             </div>
           </section>

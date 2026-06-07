@@ -46,6 +46,8 @@ const loadRazorpay = () =>
     if (window.Razorpay) return resolve(true);
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.crossOrigin = 'anonymous';
     script.onload = () => resolve(true);
     script.onerror = () => reject(new Error('Could not load Razorpay Checkout'));
     document.body.appendChild(script);
@@ -236,7 +238,9 @@ export default function PremiumPaymentSection({ booking, user }) {
       });
       checkout.open();
     } catch (error) {
-      setCheckoutError(error.friendlyMessage || formatApiError(error) || 'Could not start Razorpay. If the server just woke up, press Pay again after a few seconds.');
+      const message = error.friendlyMessage || formatApiError(error) || 'Could not start Razorpay. If the server just woke up, press Pay again after a few seconds.';
+      setCheckoutError(providers.stripe ? `${message} Stripe is available as a backup on this page.` : message);
+      if (providers.stripe) setGateway('stripe');
       setCheckoutLoading(false);
     }
   };
@@ -385,9 +389,19 @@ export default function PremiumPaymentSection({ booking, user }) {
             </div>
 
             {checkoutError && (
-              <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
-                <span className="text-wrap-anywhere">{checkoutError}</span>
-              </p>
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+                <p className="text-wrap-anywhere">{checkoutError}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-rose-700 ring-1 ring-rose-100" onClick={startCheckout} disabled={checkoutLoading || isProcessing}>
+                    Try payment again
+                  </button>
+                  {providers.stripe && gateway !== 'stripe' ? (
+                    <button type="button" className="rounded-lg bg-[#635bff] px-3 py-2 text-xs font-bold text-white" onClick={() => setGateway('stripe')} disabled={checkoutLoading || isProcessing}>
+                      Use Stripe instead
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             )}
 
             <button

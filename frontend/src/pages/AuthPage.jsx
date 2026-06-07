@@ -14,14 +14,6 @@ const perks = [
   { icon: Sparkles, title: 'Live tokens', desc: 'Book and pay online' }
 ];
 
-const demoAccounts = [
-  ['Receptionist', 'receptionist@jkhospital.com', 'Reception@123'],
-  ['Pharmacist', 'pharmacist@jkhospital.com', 'Pharmacy@123'],
-  ['Dr Ravi Kumar', 'ravi@jkhospital.com', 'Doctor@123'],
-  ['Dr Priya Sharma', 'priya@jkhospital.com', 'Doctor@123'],
-  ['Dr Arjun Menon', 'arjun@jkhospital.com', 'Doctor@123']
-];
-
 const dashboardForRole = (role) => ({
   receptionist: '/receptionist',
   doctor: '/doctor-dashboard',
@@ -194,9 +186,9 @@ export default function AuthPage({ mode }) {
                 )}
               </div>
 
-              {!isSignup && (
+              {isAdminLogin && (
                 <form onSubmit={submitLocalLogin} className="mt-6 rounded-2xl border border-medical-100 bg-white/80 p-4 shadow-sm">
-                  <p className="text-sm font-bold text-ink">Staff/demo email login</p>
+                  <p className="text-sm font-bold text-ink">Staff email/password login</p>
                   <div className="mt-3 grid gap-3">
                     <input
                       className="field"
@@ -213,18 +205,6 @@ export default function AuthPage({ mode }) {
                       onChange={(event) => setLocalLogin((value) => ({ ...value, password: event.target.value }))}
                     />
                     <button type="submit" className="btn-primary w-full">Login with email/password</button>
-                  </div>
-                  <div className="mt-3 space-y-1 text-xs text-slate-500">
-                    {demoAccounts.map(([label, email, password]) => (
-                      <button
-                        key={email}
-                        type="button"
-                        onClick={() => setLocalLogin({ email, password })}
-                        className="block text-left font-semibold text-medical-700 hover:underline"
-                      >
-                        {label}: {email} / {password}
-                      </button>
-                    ))}
                   </div>
                 </form>
               )}
