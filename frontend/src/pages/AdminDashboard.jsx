@@ -8,6 +8,7 @@ import MetricCard from '../components/MetricCard.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
 import {
+  DEPARTMENTS,
   createLocalDoctor,
   createLocalSlot,
   getLocalBookings,
@@ -25,7 +26,7 @@ import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl }
 
 const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const palette = ['#147bd1', '#10b981', '#f59e0b', '#e05283'];
-const defaultDoctorForm = { name: '', specialty: '', avatar: '', fee: 500, bio: '', isAvailable: true };
+const defaultDoctorForm = { name: '', specialty: '', specialization: '', qualification: '', department: 'General Medicine', experience: '', avatar: '', fee: 500, bio: '', isAvailable: true };
 const defaultSlotForm = {
   doctorId: '',
   label: '',
@@ -262,6 +263,8 @@ export default function AdminDashboard() {
   const validateDoctorForm = () => {
     if (!doctorForm.name.trim()) return 'Doctor name is required';
     if (!doctorForm.specialty.trim()) return 'Specialty is required';
+    if (!doctorForm.qualification.trim()) return 'Qualification is required';
+    if (!doctorForm.experience.trim()) return 'Experience is required';
     if (!isValidHttpUrl(doctorForm.avatar)) return 'Enter a valid doctor image URL';
     if (normalizeFee(doctorForm.fee) < MIN_CONSULTATION_FEE) return `Fee must be at least INR ${MIN_CONSULTATION_FEE}`;
     if (doctorForm.bio.trim().length < 12) return 'Profile must be at least 12 characters';
@@ -276,6 +279,10 @@ export default function AdminDashboard() {
       ...doctorForm,
       name: doctorForm.name.trim(),
       specialty: doctorForm.specialty.trim(),
+      specialization: (doctorForm.specialization || doctorForm.specialty).trim(),
+      qualification: doctorForm.qualification.trim(),
+      department: doctorForm.department,
+      experience: doctorForm.experience.trim(),
       avatar: doctorForm.avatar.trim(),
       bio: doctorForm.bio.trim(),
       fee: normalizeFee(doctorForm.fee)
@@ -505,6 +512,20 @@ export default function AdminDashboard() {
                     <label className="text-xs font-bold text-slate-500">
                       Specialist in
                       <input className="field mt-1 px-3 py-2" value={doctor.specialty} onChange={(event) => updateDoctor(doctor._id, 'specialty', event.target.value)} />
+                    </label>
+                    <label className="text-xs font-bold text-slate-500">
+                      Department
+                      <select className="field mt-1 px-3 py-2" value={doctor.department || 'General Medicine'} onChange={(event) => updateDoctor(doctor._id, 'department', event.target.value)}>
+                        {DEPARTMENTS.map((item) => <option key={item}>{item}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-xs font-bold text-slate-500">
+                      Qualification
+                      <input className="field mt-1 px-3 py-2" value={doctor.qualification || ''} onChange={(event) => updateDoctor(doctor._id, 'qualification', event.target.value)} />
+                    </label>
+                    <label className="text-xs font-bold text-slate-500">
+                      Experience
+                      <input className="field mt-1 px-3 py-2" value={doctor.experience || ''} onChange={(event) => updateDoctor(doctor._id, 'experience', event.target.value)} />
                     </label>
                     <label className="text-xs font-bold text-slate-500 sm:col-span-2">
                       <span className="mb-1 flex items-center gap-1"><Image size={14} /> Image URL</span>
@@ -784,6 +805,26 @@ export default function AdminDashboard() {
             Specialty
             <input className="field mt-1" required value={doctorForm.specialty} onChange={(event) => setDoctorForm((value) => ({ ...value, specialty: event.target.value }))} />
           </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-bold text-slate-500">
+              Department
+              <select className="field mt-1" value={doctorForm.department} onChange={(event) => setDoctorForm((value) => ({ ...value, department: event.target.value }))}>
+                {DEPARTMENTS.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Specialization
+              <input className="field mt-1" value={doctorForm.specialization} placeholder="Defaults to specialty" onChange={(event) => setDoctorForm((value) => ({ ...value, specialization: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Qualification
+              <input className="field mt-1" required value={doctorForm.qualification} onChange={(event) => setDoctorForm((value) => ({ ...value, qualification: event.target.value }))} />
+            </label>
+            <label className="text-xs font-bold text-slate-500">
+              Experience
+              <input className="field mt-1" required value={doctorForm.experience} placeholder="10 years" onChange={(event) => setDoctorForm((value) => ({ ...value, experience: event.target.value }))} />
+            </label>
+          </div>
           <label className="text-xs font-bold text-slate-500">
             Image URL
             <input className="field mt-1" required type="url" value={doctorForm.avatar} onChange={(event) => setDoctorForm((value) => ({ ...value, avatar: event.target.value }))} />

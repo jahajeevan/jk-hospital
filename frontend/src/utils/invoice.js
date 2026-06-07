@@ -121,3 +121,82 @@ export async function downloadInvoice(appointment) {
 
   doc.save(`${appointment.invoiceNumber || 'jk-hospital-receipt'}.pdf`);
 }
+
+const writeHeader = (doc, title) => {
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.setFillColor(13, 99, 173);
+  doc.rect(0, 0, pageW, 34, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont(undefined, 'bold');
+  doc.text('JK Hospital', 16, 15);
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.text('Professional medical record · Emergency: 7845265507', 16, 23);
+  doc.text(title, pageW - 16, 18, { align: 'right' });
+};
+
+export async function downloadPrescriptionPdf(appointment) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const rx = appointment.prescription || {};
+  const patient = appointment.patientDetails || {};
+  const doctor = appointment.doctor || {};
+  writeHeader(doc, 'PRESCRIPTION');
+
+  let y = 48;
+  const rows = [
+    ['Doctor', `${doctor.name || rx.doctorName || 'Doctor'} · ${doctor.specialization || doctor.specialty || 'Specialist'}`],
+    ['Patient', `${patient.name || appointment.patientName || 'Patient'} · ${patient.age || '—'} yrs · ${patient.gender || '—'}`],
+    ['Token/date', `#${appointment.tokenNumber || '—'} · ${new Date(appointment.appointmentDate || Date.now()).toLocaleDateString()}`],
+    ['Symptoms', rx.symptoms || '—'],
+    ['Diagnosis', rx.diagnosis || '—']
+  ];
+  rows.forEach(([label, value]) => {
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont(undefined, 'bold');
+    doc.text(label, 16, y);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont(undefined, 'normal');
+    doc.text(doc.splitTextToSize(String(value), 130), 52, y);
+    y += 10;
+  });
+
+  doc.setTextColor(13, 99, 173);
+  doc.setFont(undefined, 'bold');
+  doc.text('Medicines', 16, y + 4);
+  y += 12;
+  (rx.medicines || []).forEach((item, index) => {
+    doc.setTextColor(15, 23, 42);
+    doc.setFont(undefined, 'normal');
+    doc.text(`${index + 1}. ${item.name} · M:${item.morning || '-'} A:${item.afternoon || '-'} N:${item.night || '-'} · ${item.days || '-'} days`, 18, y);
+    y += 8;
+  });
+  doc.text(doc.splitTextToSize(`Advice: ${rx.advice || rx.remarks || '—'}`, 170), 16, y + 8);
+  doc.text(`Follow-up: ${rx.followUpRequired ? `${rx.followUpDate || ''} ${rx.followUpNotes || ''}` : 'Not required'}`, 16, y + 24);
+  doc.line(135, 255, 190, 255);
+  doc.text('Doctor signature', 148, 262);
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text('JK Hospital · Main Road, Tamil Nadu · care@jkhospital.local', 16, 286);
+  doc.save(`JKH-prescription-${appointment.tokenNumber || Date.now()}.pdf`);
+}
+
+export async function downloadVisitSummaryPdf(record) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  writeHeader(doc, 'VISIT SUMMARY');
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(11);
+  doc.text(record.title || 'Medical record summary', 16, 48);
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(new Date(record.createdAt || Date.now()).toLocaleString(), 16, 56);
+  doc.setTextColor(15, 23, 42);
+  doc.text(doc.splitTextToSize(record.aiSummary || record.sourceText || 'No details saved.', 178), 16, 70);
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text('JK Hospital · Main Road, Tamil Nadu · care@jkhospital.local', 16, 286);
+  doc.save(`${record.title || 'jk-hospital-visit-summary'}.pdf`);
+}

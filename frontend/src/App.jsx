@@ -16,6 +16,7 @@ const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage.jsx'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
 const Services = lazy(() => import('./pages/Services.jsx'));
 const SmartAiPage = lazy(() => import('./pages/SmartAiPage.jsx'));
+const StaffDashboard = lazy(() => import('./pages/StaffDashboard.jsx'));
 
 function ScreenLoader() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/services" element={<Suspense fallback={<ScreenLoader />}><Services /></Suspense>} />
         <Route path="/ai" element={<Suspense fallback={<ScreenLoader />}><SmartAiPage /></Suspense>} />
         <Route path="/doctors" element={<Suspense fallback={<ScreenLoader />}><Doctors /></Suspense>} />
+        <Route path="/staff" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute><StaffDashboard /></ProtectedRoute></Suspense>} />
         <Route path="/contact" element={<Suspense fallback={<ScreenLoader />}><Contact /></Suspense>} />
         <Route path="/complete-profile" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute allowIncompleteProfile><CompleteProfilePage /></ProtectedRoute></Suspense>} />
         <Route path="/book" element={<Suspense fallback={<ScreenLoader />}><ProtectedRoute><BookingPage /></ProtectedRoute></Suspense>} />

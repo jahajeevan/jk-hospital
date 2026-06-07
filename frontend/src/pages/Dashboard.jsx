@@ -1,4 +1,4 @@
-import { Bell, CalendarClock, Copy, FileText, Plus, RefreshCcw, ShieldAlert, Stethoscope, XCircle } from 'lucide-react';
+import { Bell, CalendarClock, Copy, FileText, Plus, RefreshCcw, Stethoscope, XCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -6,11 +6,12 @@ import { Link } from 'react-router-dom';
 import MetricCard from '../components/MetricCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { downloadInvoice } from '../utils/invoice.js';
+import { downloadInvoice, downloadPrescriptionPdf, downloadVisitSummaryPdf } from '../utils/invoice.js';
 import {
   cancelLocalBooking,
   getLocalBookingsForUser,
   getLocalMedicalRecordsForUser,
+  getLocalNotifications,
   getLocalRefundsForUser,
   saveLocalRefund
 } from '../utils/localStore.js';
@@ -35,12 +36,14 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState([]);
   const [refunds, setRefunds] = useState([]);
   const [records, setRecords] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [refundForm, setRefundForm] = useState({ appointmentId: '', reason: '', emergencyExplanation: '' });
 
   const reload = () => {
     setAppointments(getLocalBookingsForUser(user?.email));
     setRefunds(getLocalRefundsForUser(user?.email));
     setRecords(getLocalMedicalRecordsForUser(user?.email));
+    setNotifications(getLocalNotifications({ email: user?.email }));
   };
 
   useEffect(() => {
@@ -49,8 +52,10 @@ export default function Dashboard() {
     return () => window.removeEventListener('jk-local-sync', reload);
   }, [user?.email]);
 
-  const active = appointments.find((item) => ['payment_submitted', 'confirmed', 'approved', 'rescheduled'].includes(item.status));
-  const upcoming = appointments.filter((item) => !['cancelled', 'declined', 'rejected'].includes(item.status));
+  const active = appointments.find((item) => ['payment_submitted', 'confirmed', 'approved', 'rescheduled', 'arrived', 'in_progress', 'prescription_generated', 'pharmacy_pending', 'paid'].includes(item.status));
+  const upcoming = appointments.filter((item) => !['cancelled', 'declined', 'rejected', 'completed'].includes(item.status));
+  const past = appointments.filter((item) => ['cancelled', 'declined', 'rejected', 'completed'].includes(item.status));
+  const followUps = appointments.filter((item) => item.prescription?.followUpRequired);
 
   const copyToken = () => {
     if (!active?.tokenNumber) return toast.error('No token yet');
@@ -135,6 +140,25 @@ export default function Dashboard() {
 
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
               <section className="patient-panel rounded-xl p-5">
+                <h2 className="text-lg font-bold">Patient profile</h2>
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                  {[
+                    ['Full name', active?.patientDetails?.name || user?.name],
+                    ['Age / gender', `${active?.patientDetails?.age || '—'} / ${active?.patientDetails?.gender || '—'}`],
+                    ['Blood group', active?.patientDetails?.bloodGroup || '—'],
+                    ['Mobile', active?.patientDetails?.phone || '—'],
+                    ['Email', active?.patientDetails?.email || user?.email],
+                    ['Emergency', active?.patientDetails?.emergencyContact || '—'],
+                    ['Address', active?.patientDetails?.address || '—']
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
+                      <dt className="text-xs font-bold text-slate-500">{label}</dt>
+                      <dd className="text-wrap-anywhere font-semibold text-ink">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+              <section className="patient-panel rounded-xl p-5">
                 <h2 className="text-lg font-bold">Visit checklist</h2>
                 <ul className="mt-4 space-y-2 text-sm text-slate-600">
                   {checklist.map((item) => (
@@ -153,6 +177,30 @@ export default function Dashboard() {
                   ))}
                 </div>
               </section>
+              <section className="patient-panel rounded-xl p-5">
+                <div className="flex items-center gap-2"><Bell size={18} className="text-medical-600" /><h2 className="text-lg font-bold">Notifications</h2></div>
+                <div className="mt-4 space-y-3">
+                  {notifications.slice(0, 4).map((item) => (
+                    <div key={item._id} className="rounded-lg bg-white p-3 text-sm ring-1 ring-slate-100">
+                      <p className="font-bold">{item.title}</p>
+                      <p className="text-slate-600">{item.message}</p>
+                    </div>
+                  ))}
+                  {!notifications.length && <p className="text-sm text-slate-500">No notifications yet.</p>}
+                </div>
+              </section>
+              <section className="patient-panel rounded-xl p-5 lg:col-span-2">
+                <h2 className="text-lg font-bold">Follow-up recommendations</h2>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {followUps.map((appointment) => (
+                    <div key={appointment._id} className="rounded-lg bg-white p-3 text-sm ring-1 ring-slate-100">
+                      <p className="font-bold">{appointment.doctor?.name} · {appointment.prescription.followUpDate || 'Date pending'}</p>
+                      <p className="text-slate-600">{appointment.prescription.followUpNotes || 'Follow-up required as advised by doctor.'}</p>
+                    </div>
+                  ))}
+                  {!followUps.length && <p className="text-sm text-slate-500">No follow-up instructions yet.</p>}
+                </div>
+              </section>
             </div>
           </>
         )}
@@ -169,11 +217,13 @@ export default function Dashboard() {
                       <p className="font-bold">{appointment.doctor?.name}</p>
                       <p className="text-wrap-anywhere text-sm text-slate-500">{appointment.slotLabel} · {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
                       <p className="text-wrap-anywhere mt-1 text-sm">Token: <strong>{appointment.tokenNumber || 'Pending'}</strong></p>
+                      <p className="text-wrap-anywhere mt-1 text-xs text-slate-500">Queue #{appointment.queuePosition || appointment.tokenNumber || '—'} · {Math.max((appointment.queuePosition || appointment.tokenNumber || 1) - 1, 0)} ahead · ~{appointment.estimatedWaitMinutes || 0} min wait</p>
                     </div>
                     <StatusBadge status={appointment.status} />
                   </div>
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <button type="button" onClick={() => downloadInvoice(appointment)} className="btn-secondary px-3 py-2 text-xs"><FileText size={14} /> Invoice</button>
+                    {appointment.prescription && <button type="button" onClick={() => downloadPrescriptionPdf(appointment)} className="btn-secondary px-3 py-2 text-xs"><FileText size={14} /> Prescription PDF</button>}
                     <Link to="/book" className="btn-secondary px-3 py-2 text-xs"><RefreshCcw size={14} /> Rebook</Link>
                     {appointment.status !== 'cancelled' && (
                       <button type="button" onClick={() => cancel(appointment._id)} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"><XCircle size={14} /> Cancel</button>
@@ -207,6 +257,7 @@ export default function Dashboard() {
                     <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
                       <p className="whitespace-pre-wrap text-wrap-anywhere">{record.aiSummary || record.sourceText || 'No details saved.'}</p>
                     </div>
+                    <button type="button" onClick={() => downloadVisitSummaryPdf(record)} className="btn-secondary mt-3 px-3 py-2 text-xs"><FileText size={14} /> Download PDF</button>
                   </article>
                 ))}
               </div>
@@ -216,6 +267,10 @@ export default function Dashboard() {
 
         {tab === 'refunds' && (
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            <section className="patient-panel rounded-xl p-5 lg:col-span-2">
+              <h2 className="text-xl font-bold">Upcoming and past summary</h2>
+              <p className="mt-2 text-sm text-slate-600">Upcoming appointments: <strong>{upcoming.length}</strong> · Past appointments: <strong>{past.length}</strong></p>
+            </section>
             <section className="patient-panel rounded-xl p-5">
               <h2 className="text-xl font-bold">Submit refund request</h2>
               <select className="field mt-4" value={refundForm.appointmentId} onChange={(e) => setRefundForm((v) => ({ ...v, appointmentId: e.target.value }))}>

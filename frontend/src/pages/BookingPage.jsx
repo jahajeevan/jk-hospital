@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import AiVisitPrep from '../components/AiVisitPrep.jsx';
 import BookingStepper from '../components/BookingStepper.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { getLocalDoctors, getSlotAvailability } from '../utils/localStore.js';
+import { DEPARTMENTS, getLocalDoctors, getSlotAvailability } from '../utils/localStore.js';
 import { normalizeFee } from '../utils/paymentRules.js';
 import { cleanIndianMobile, isValidIndianMobile } from '../utils/validation.js';
 
@@ -15,7 +15,7 @@ const localIsoDate = (value = new Date()) => {
   return offsetDate.toISOString().slice(0, 10);
 };
 const today = localIsoDate();
-const STEPS = ['Doctor', 'Date & slot', 'Patient', 'Review'];
+const STEPS = ['Department', 'Doctor', 'Date & slot', 'Patient', 'Review'];
 const slotBlockedMessage = (reason) =>
   `${reason || 'Selected slot is not bookable now'}. Please choose another slot, another date, or book for the next day.`;
 const failValidation = (message) => {
@@ -23,10 +23,11 @@ const failValidation = (message) => {
   return false;
 };
 const stepIndex = {
-  doctor: 0,
-  slot: 1,
-  patient: 2,
-  review: 3
+  department: 0,
+  doctor: 1,
+  slot: 2,
+  patient: 3,
+  review: 4
 };
 
 export default function BookingPage() {
@@ -35,10 +36,11 @@ export default function BookingPage() {
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [doctors, setDoctors] = useState(() => getLocalDoctors());
-  const [doctorId, setDoctorId] = useState(() => state?.doctorId || getLocalDoctors()[0]?._id);
+  const [department, setDepartment] = useState(() => state?.department || getLocalDoctors().find((item) => item._id === state?.doctorId)?.department || DEPARTMENTS[0]);
+  const [doctorId, setDoctorId] = useState(() => state?.doctorId || getLocalDoctors().find((item) => item.department === DEPARTMENTS[0])?._id);
   const [date, setDate] = useState(today);
   const [slotId, setSlotId] = useState('');
-  const [patient, setPatient] = useState({ name: user?.name || '', age: '', gender: '', phone: '', symptoms: '' });
+  const [patient, setPatient] = useState({ name: user?.name || '', age: '', gender: '', bloodGroup: '', phone: '', email: user?.email || '', address: '', emergencyContact: '', symptoms: '' });
 
   useEffect(() => {
     const sync = () => setDoctors(getLocalDoctors());
@@ -51,7 +53,8 @@ export default function BookingPage() {
     if (state?.doctorId) setDoctorId(state.doctorId);
   }, [state?.doctorId]);
 
-  const doctor = doctors.find((item) => item._id === doctorId) || doctors[0];
+  const departmentDoctors = doctors.filter((item) => item.department === department);
+  const doctor = departmentDoctors.find((item) => item._id === doctorId) || departmentDoctors[0];
   const slots = (doctor?.slots || []).filter((item) => item.isActive !== false && (!item.date || item.date === date));
   const slot = slots.find((item) => item._id === slotId);
   const availability = useMemo(() => getSlotAvailability(doctor, slot?._id, date), [doctor, slot?._id, date]);
@@ -69,7 +72,15 @@ export default function BookingPage() {
     if (slotId && !slots.some((item) => item._id === slotId)) setSlotId('');
   }, [slotId, slots]);
 
+  useEffect(() => {
+    if (!departmentDoctors.some((item) => item._id === doctorId)) {
+      setDoctorId(departmentDoctors[0]?._id || '');
+      setSlotId('');
+    }
+  }, [department, doctors]);
+
   const validateStep = (targetStep = step) => {
+    if (targetStep === stepIndex.department && !department) return failValidation('Select a department');
     if (targetStep === stepIndex.doctor) {
       if (!doctor) return failValidation('Select a doctor');
       if (doctor.isAvailable === false) return failValidation('Selected doctor is currently on leave');
@@ -86,13 +97,14 @@ export default function BookingPage() {
       if (!patient.age || Number(patient.age) < 1 || Number(patient.age) > 120) return failValidation('Enter a valid age from 1 to 120');
       if (!patient.gender) return failValidation('Select gender');
       if (!isValidIndianMobile(patient.phone)) return failValidation('Enter valid 10-digit Indian mobile number');
+      if (patient.emergencyContact && !isValidIndianMobile(patient.emergencyContact)) return failValidation('Enter a valid emergency contact number');
       if (patient.symptoms.trim().length < 3) return failValidation('Describe symptoms or reason for visit');
     }
     return true;
   };
 
   const validateBooking = () => {
-    for (const targetStep of [stepIndex.doctor, stepIndex.slot, stepIndex.patient]) {
+    for (const targetStep of [stepIndex.department, stepIndex.doctor, stepIndex.slot, stepIndex.patient]) {
       if (!validateStep(targetStep)) {
         setStep(targetStep);
         return false;
@@ -139,9 +151,35 @@ export default function BookingPage() {
               <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
                 {step === 0 && (
                   <div>
+                    <h2 className="flex items-center gap-2 text-xl font-bold"><UserRound size={20} /> Choose department</h2>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {DEPARTMENTS.map((item) => {
+                        const count = doctors.filter((doctorItem) => doctorItem.department === item).length;
+                        return (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => {
+                              setDepartment(item);
+                              setDoctorId(doctors.find((doctorItem) => doctorItem.department === item)?._id || '');
+                              setSlotId('');
+                            }}
+                            className={`booking-select-card text-left transition ${department === item ? 'active' : ''}`}
+                          >
+                            <p className="font-bold">{item}</p>
+                            <p className="mt-2 text-xs text-slate-500">{count ? `${count} doctor${count > 1 ? 's' : ''} available` : 'No doctor configured yet'}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {step === 1 && (
+                  <div>
                     <h2 className="flex items-center gap-2 text-xl font-bold"><UserRound size={20} /> Choose doctor</h2>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      {doctors.map((item) => (
+                      {departmentDoctors.map((item) => (
                         <button
                           key={item._id}
                           type="button"
@@ -153,15 +191,17 @@ export default function BookingPage() {
                           className={`booking-select-card text-left transition ${doctorId === item._id ? 'active' : ''} ${item.isAvailable === false ? 'cursor-not-allowed opacity-60' : ''}`}
                         >
                           <p className="font-bold">{item.name}</p>
-                          <p className="text-sm text-medical-600">{item.specialty}</p>
+                          <p className="text-sm text-medical-600">{item.specialization || item.specialty}</p>
+                          <p className="mt-1 text-xs text-slate-500">{item.qualification} · {item.experience} · INR {item.fee}</p>
                           <p className="mt-2 text-xs text-slate-500">{item.isAvailable === false ? 'On leave' : 'Available today'}</p>
                         </button>
                       ))}
+                      {!departmentDoctors.length && <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800 sm:col-span-2">No doctors are configured for {department} yet.</p>}
                     </div>
                   </div>
                 )}
 
-                {step === 1 && (
+                {step === 2 && (
                   <div>
                     <h2 className="flex items-center gap-2 text-xl font-bold"><Calendar size={20} /> Date & OP slot</h2>
                     <input type="date" min={today} max={maxBookingDate} className="field mt-4" value={date} onChange={(e) => { setDate(e.target.value); setSlotId(''); }} />
@@ -205,7 +245,7 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                {step === 2 && (
+                {step === 3 && (
                   <div>
                     <h2 className="text-xl font-bold">Patient details</h2>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -217,20 +257,30 @@ export default function BookingPage() {
                         <option>Male</option>
                         <option>Other</option>
                       </select>
+                      <select className="field" value={patient.bloodGroup} onChange={(e) => setPatient({ ...patient, bloodGroup: e.target.value })}>
+                        <option value="">Blood group</option>
+                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((item) => <option key={item}>{item}</option>)}
+                      </select>
                       <input className="field sm:col-span-2" inputMode="numeric" maxLength={10} required placeholder="10-digit mobile" value={patient.phone} onChange={(e) => setPatient({ ...patient, phone: cleanIndianMobile(e.target.value) })} />
+                      <input className="field sm:col-span-2" type="email" placeholder="Email address" value={patient.email} onChange={(e) => setPatient({ ...patient, email: e.target.value })} />
+                      <input className="field sm:col-span-2" inputMode="numeric" maxLength={10} placeholder="Emergency contact number" value={patient.emergencyContact} onChange={(e) => setPatient({ ...patient, emergencyContact: cleanIndianMobile(e.target.value) })} />
+                      <textarea className="field sm:col-span-2" rows={2} placeholder="Address" value={patient.address} onChange={(e) => setPatient({ ...patient, address: e.target.value })} />
                       <textarea className="field sm:col-span-2" rows={4} required placeholder="Symptoms / reason for visit" value={patient.symptoms} onChange={(e) => setPatient({ ...patient, symptoms: e.target.value })} />
                     </div>
                     <AiVisitPrep patient={patient} doctor={doctor} slot={slot} appointmentDate={date} />
                   </div>
                 )}
 
-                {step === 3 && (
+                {step === 4 && (
                   <div>
                     <h2 className="text-xl font-bold">Review & confirm</h2>
                     <ul className="mt-4 space-y-3 text-sm">
                       {[
+                        ['Department', department],
                         ['Doctor', doctor?.name],
-                        ['Specialty', doctor?.specialty],
+                        ['Specialty', doctor?.specialization || doctor?.specialty],
+                        ['Qualification', doctor?.qualification],
+                        ['Experience', doctor?.experience],
                         ['Date', date],
                         ['Slot', slot ? `${slot.label} (${slot.startTime}–${slot.endTime})` : 'No slot selected'],
                         ['Patient', patient.name],

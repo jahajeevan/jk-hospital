@@ -5,8 +5,22 @@ import { migratePlainKey, secureGet, secureSet } from './secureStore.js';
 const DOCTORS_KEY = 'jk_local_doctors';
 const BOOKINGS_KEY = 'jk_local_bookings';
 const MEDICAL_RECORDS_KEY = 'jk_medical_records';
+const INVENTORY_KEY = 'jk_pharmacy_inventory';
+const AUDIT_LOG_KEY = 'jk_audit_logs';
+const NOTIFICATIONS_KEY = 'jk_notifications';
 const VERSION_KEY = 'jk_local_version';
 const STORE_VERSION = '6';
+
+export const DEPARTMENTS = [
+  'General Medicine',
+  'Cardiology',
+  'Orthopedics',
+  'Pediatrics',
+  'Dermatology',
+  'Neurology',
+  'ENT',
+  'Gynecology'
+];
 
 let doctorsCache = null;
 let bookingsCache = null;
@@ -39,7 +53,11 @@ const normalizeDoctor = (doctor) => ({
   ...doctor,
   _id: doctor._id || makeId('doc'),
   name: doctor.name || 'Unnamed doctor',
-  specialty: doctor.specialty || 'General Physician',
+  specialty: doctor.specialty || doctor.specialization || 'General Physician',
+  specialization: doctor.specialization || doctor.specialty || 'General Physician',
+  qualification: doctor.qualification || 'MBBS',
+  department: DEPARTMENTS.includes(doctor.department) ? doctor.department : 'General Medicine',
+  experience: doctor.experience || '5 years',
   bio: doctor.bio || 'Patient-focused healthcare professional.',
   avatar: doctor.avatar || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80',
   fee: normalizeFee(doctor.fee),
@@ -80,6 +98,33 @@ const persistBookings = async () => {
   await secureSet(BOOKINGS_KEY, bookingsCache);
   window.dispatchEvent(new Event('jk-local-sync'));
 };
+
+const getJson = (key, fallback = []) => JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+const setJson = (key, value) => {
+  localStorage.setItem(key, JSON.stringify(value));
+  window.dispatchEvent(new Event('jk-local-sync'));
+};
+
+export const writeAuditLog = ({ role = 'system', action, actor = 'JK Hospital', bookingId = '', details = '' }) => {
+  const entry = { _id: makeId('AUD'), role, action, actor, bookingId, details, timestamp: new Date().toISOString() };
+  setJson(AUDIT_LOG_KEY, [entry, ...getLocalAuditLogs()].slice(0, 250));
+  return entry;
+};
+
+export const getLocalAuditLogs = () => getJson(AUDIT_LOG_KEY);
+
+export const addLocalNotification = ({ email = '', role = 'all', title, message, type = 'info' }) => {
+  const entry = { _id: makeId('NTF'), email: normalizeEmail(email), role, title, message, type, read: false, createdAt: new Date().toISOString() };
+  setJson(NOTIFICATIONS_KEY, [entry, ...getLocalNotifications()].slice(0, 250));
+  return entry;
+};
+
+export const getLocalNotifications = ({ email = '', role = '' } = {}) =>
+  getJson(NOTIFICATIONS_KEY).filter((item) => {
+    const emailMatch = !email || !item.email || item.email === normalizeEmail(email);
+    const roleMatch = !role || item.role === 'all' || item.role === role;
+    return emailMatch && roleMatch;
+  });
 
 export const getLocalDoctors = () => {
   if (!doctorsCache) doctorsCache = seedDoctors();
@@ -221,7 +266,7 @@ export const createVerifiedLocalBooking = ({ doctor, slot, date, patient, user, 
   const booking = {
     _id: `APT-${Date.now()}`,
     patientId: `PAT-${String(Date.now()).slice(-6)}`,
-    patientEmail: user?.email,
+    patientEmail: user?.email || patient.email,
     patientName: patient.name || user?.name,
     doctor: liveDoctor,
     slotId: slot._id,
@@ -233,7 +278,7 @@ export const createVerifiedLocalBooking = ({ doctor, slot, date, patient, user, 
     estimatedWaitMinutes: Math.max(tokenNumber - 1, 0) * 8,
     status: 'approved',
     adminNote: `${payment.method === 'razorpay' ? 'Razorpay' : 'Stripe'} payment verified automatically`,
-    patientDetails: { ...patient, email: user?.email },
+    patientDetails: { ...patient, email: user?.email || patient.email },
     payment,
     invoiceNumber: `INV-${Date.now()}`,
     createdAt: new Date().toISOString(),
@@ -244,6 +289,13 @@ export const createVerifiedLocalBooking = ({ doctor, slot, date, patient, user, 
   };
 
   saveLocalBookings([booking, ...getLocalBookings()]);
+  addLocalNotification({
+    email: user?.email,
+    title: 'Appointment booked',
+    message: `Token #${tokenNumber} booked with ${liveDoctor.name} for ${liveSlot.label}.`,
+    type: 'success'
+  });
+  writeAuditLog({ role: 'patient', actor: user?.email, action: 'Appointment booked', bookingId: booking._id, details: `${liveDoctor.name} · token ${tokenNumber}` });
   return booking;
 };
 
@@ -291,6 +343,7 @@ export const updateLocalBookingStatus = (id, status, adminNote = '') => {
       : booking
   );
   saveLocalBookings(bookings);
+  writeAuditLog({ role: 'admin', action: `Appointment ${status}`, bookingId: id, details: adminNote });
   return bookings.find((booking) => booking._id === id);
 };
 
@@ -308,7 +361,99 @@ export const cancelLocalBooking = (id) => {
   }
   const updated = bookings.map((item) => (item._id === id ? { ...item, status: 'cancelled', adminNote: 'Cancelled by patient' } : item));
   saveLocalBookings(updated);
+  addLocalNotification({ email: booking?.patientEmail, title: 'Appointment cancelled', message: 'Your appointment was cancelled by patient request.', type: 'warning' });
+  writeAuditLog({ role: 'patient', actor: booking?.patientEmail, action: 'Cancelled appointment', bookingId: id });
   return updated;
+};
+
+const workflowStatusLabels = {
+  arrived: 'Patient arrived',
+  in_progress: 'Consultation started',
+  prescription_generated: 'Prescription generated',
+  pharmacy_pending: 'Pharmacy bill pending',
+  paid: 'Payment received',
+  completed: 'Visit completed',
+  no_show: 'No show',
+  cancelled_by_hospital: 'Cancelled by hospital'
+};
+
+export const updateAppointmentWorkflow = (id, status, { role = 'staff', actor = 'JK Hospital staff', note = '', extra = {} } = {}) => {
+  const bookings = getLocalBookings().map((booking) => {
+    if (booking._id !== id) return booking;
+    return {
+      ...booking,
+      ...extra,
+      status,
+      timeline: [
+        ...(booking.timeline || []),
+        { label: workflowStatusLabels[status] || `Status changed to ${status}`, at: new Date().toISOString(), tone: status === 'completed' ? 'green' : 'blue' }
+      ]
+    };
+  });
+  saveLocalBookings(bookings);
+  const booking = bookings.find((item) => item._id === id);
+  addLocalNotification({
+    email: booking?.patientEmail,
+    title: workflowStatusLabels[status] || 'Appointment updated',
+    message: `${booking?.doctor?.name || 'Doctor'} · token #${booking?.tokenNumber || 'pending'}${note ? ` · ${note}` : ''}`,
+    type: status === 'completed' || status === 'paid' ? 'success' : 'info'
+  });
+  writeAuditLog({ role, actor, action: workflowStatusLabels[status] || `Status ${status}`, bookingId: id, details: note });
+  return booking;
+};
+
+export const markPatientArrived = (id, receptionistName = 'Receptionist') =>
+  updateAppointmentWorkflow(id, 'arrived', {
+    role: 'receptionist',
+    actor: receptionistName,
+    extra: { arrivalTime: new Date().toISOString(), receptionistId: receptionistName }
+  });
+
+export const createWalkInBooking = ({ patientName, mobile, doctorId, department, receptionistName = 'Receptionist' }) => {
+  const doctor = getLocalDoctors().find((item) => item._id === doctorId && item.department === department);
+  if (!doctor) throw new Error('Select a doctor in the chosen department');
+  const activeSlot = doctor.slots.find((item) => item.isActive !== false) || {
+    _id: makeId('walkin-slot'),
+    label: 'Walk-in OP',
+    startTime: new Date().toTimeString().slice(0, 5),
+    endTime: '23:59',
+    tokenLimit: 999,
+    bookedTokens: 0,
+    fee: doctor.fee
+  };
+  const doctors = getLocalDoctors();
+  const doctorIndex = doctors.findIndex((item) => item._id === doctor._id);
+  const slotIndex = doctors[doctorIndex]?.slots.findIndex((item) => item._id === activeSlot._id);
+  const tokenNumber = (activeSlot.bookedTokens || 0) + 1;
+  if (slotIndex >= 0) {
+    doctors[doctorIndex].slots[slotIndex].bookedTokens = tokenNumber;
+    saveLocalDoctors(doctors);
+  }
+  const booking = {
+    _id: `WALK-${Date.now()}`,
+    patientId: `WALK-${String(Date.now()).slice(-6)}`,
+    patientEmail: '',
+    patientName,
+    doctor,
+    slotId: activeSlot._id,
+    slotLabel: activeSlot.label,
+    appointmentDate: new Date().toISOString(),
+    tokenNumber,
+    requestedPosition: tokenNumber,
+    queuePosition: tokenNumber,
+    estimatedWaitMinutes: Math.max(tokenNumber - 1, 0) * 8,
+    status: 'arrived',
+    patientDetails: { name: patientName, phone: mobile, department },
+    payment: { amount: normalizeFee(activeSlot.fee, doctor.fee), method: 'walk-in', status: 'pending' },
+    invoiceNumber: `WALK-INV-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    arrivalTime: new Date().toISOString(),
+    receptionistId: receptionistName,
+    timeline: [{ label: 'Walk-in registered and marked arrived', at: new Date().toISOString(), tone: 'blue' }]
+  };
+  saveLocalBookings([booking, ...getLocalBookings()]);
+  writeAuditLog({ role: 'receptionist', actor: receptionistName, action: 'Created walk-in appointment', bookingId: booking._id, details: `${patientName} · ${doctor.name}` });
+  return booking;
 };
 
 export const getLocalRefunds = () => JSON.parse(localStorage.getItem('jk_refunds') || '[]');
@@ -360,6 +505,136 @@ export const saveLocalMedicalRecord = ({ email, type, title, sourceText, aiSumma
   localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify([entry, ...records]));
   window.dispatchEvent(new Event('jk-local-sync'));
   return entry;
+};
+
+const seedInventory = () => [
+  { _id: 'med-paracetamol', name: 'Paracetamol 500mg', batchNumber: 'JK-PARA-26A', expiryDate: '2027-04-30', purchasePrice: 1.2, sellingPrice: 3, currentStock: 180, minimumStockLevel: 50 },
+  { _id: 'med-amoxicillin', name: 'Amoxicillin 500mg', batchNumber: 'JK-AMOX-26B', expiryDate: '2026-12-31', purchasePrice: 6, sellingPrice: 12, currentStock: 80, minimumStockLevel: 30 },
+  { _id: 'med-cetirizine', name: 'Cetirizine 10mg', batchNumber: 'JK-CET-26A', expiryDate: '2027-02-28', purchasePrice: 1, sellingPrice: 4, currentStock: 120, minimumStockLevel: 40 }
+];
+
+export const getLocalInventory = () => {
+  const current = getJson(INVENTORY_KEY, null);
+  if (current) return current;
+  setJson(INVENTORY_KEY, seedInventory());
+  return getJson(INVENTORY_KEY);
+};
+
+export const saveLocalMedicine = (medicine) => {
+  const nextMedicine = {
+    _id: medicine._id || makeId('MED'),
+    name: medicine.name || 'Medicine',
+    batchNumber: medicine.batchNumber || '',
+    expiryDate: medicine.expiryDate || '',
+    purchasePrice: Number(medicine.purchasePrice || 0),
+    sellingPrice: Number(medicine.sellingPrice || 0),
+    currentStock: Math.max(Number(medicine.currentStock || 0), 0),
+    minimumStockLevel: Math.max(Number(medicine.minimumStockLevel || 0), 0)
+  };
+  const inventory = getLocalInventory();
+  const exists = inventory.some((item) => item._id === nextMedicine._id);
+  setJson(INVENTORY_KEY, exists ? inventory.map((item) => (item._id === nextMedicine._id ? nextMedicine : item)) : [nextMedicine, ...inventory]);
+  return nextMedicine;
+};
+
+export const removeLocalMedicine = (id) => {
+  setJson(INVENTORY_KEY, getLocalInventory().filter((item) => item._id !== id));
+};
+
+const inventoryAlerts = (inventory = getLocalInventory()) =>
+  inventory.filter((item) => {
+    const expiresSoon = item.expiryDate && new Date(item.expiryDate).getTime() - Date.now() < 1000 * 60 * 60 * 24 * 60;
+    return item.currentStock <= item.minimumStockLevel || expiresSoon;
+  });
+
+export const getInventoryAlerts = () => inventoryAlerts();
+
+export const savePrescriptionForBooking = ({ bookingId, doctorName = 'Doctor', symptoms, diagnosis, medicines = [], advice = '', followUpRequired = false, followUpDate = '', followUpNotes = '', remarks = '' }) => {
+  const prescription = {
+    _id: makeId('RX'),
+    symptoms,
+    diagnosis,
+    medicines: medicines.filter((item) => item.name?.trim()),
+    advice,
+    followUpRequired,
+    followUpDate,
+    followUpNotes,
+    remarks,
+    doctorName,
+    generatedAt: new Date().toISOString()
+  };
+  const booking = updateAppointmentWorkflow(bookingId, 'prescription_generated', {
+    role: 'doctor',
+    actor: doctorName,
+    note: diagnosis,
+    extra: { prescription, consultationEndTime: new Date().toISOString() }
+  });
+  addLocalNotification({ email: booking?.patientEmail, title: 'Prescription generated', message: `${doctorName} saved your prescription.`, type: 'success' });
+  return booking;
+};
+
+export const savePharmacyBillForBooking = ({ bookingId, pharmacistName = 'Pharmacist', items = [], paymentMethod = 'Cash' }) => {
+  const inventory = getLocalInventory();
+  const billItems = items
+    .filter((item) => item.name?.trim() && Number(item.quantity) > 0)
+    .map((item) => ({
+      medicineId: item.medicineId || '',
+      name: item.name,
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice || 0),
+      total: Number(item.quantity) * Number(item.unitPrice || 0)
+    }));
+  const totalAmount = billItems.reduce((sum, item) => sum + item.total, 0);
+  const nextInventory = inventory.map((medicine) => {
+    const sold = billItems.filter((item) => item.medicineId === medicine._id).reduce((sum, item) => sum + item.quantity, 0);
+    return sold ? { ...medicine, currentStock: Math.max(medicine.currentStock - sold, 0) } : medicine;
+  });
+  setJson(INVENTORY_KEY, nextInventory);
+  inventoryAlerts(nextInventory).forEach((medicine) =>
+    addLocalNotification({
+      role: 'pharmacist',
+      title: medicine.currentStock <= medicine.minimumStockLevel ? 'Low stock alert' : 'Expiry alert',
+      message: `${medicine.name} needs attention.`,
+      type: 'warning'
+    })
+  );
+  const pharmacyBill = {
+    _id: makeId('BILL'),
+    billNumber: `BILL-${Date.now()}`,
+    billDate: new Date().toISOString(),
+    items: billItems,
+    totalAmount,
+    paymentMethod,
+    paymentTime: new Date().toISOString(),
+    pharmacistName
+  };
+  const booking = updateAppointmentWorkflow(bookingId, 'completed', {
+    role: 'pharmacist',
+    actor: pharmacistName,
+    note: `Paid by ${paymentMethod}`,
+    extra: {
+      pharmacyBill,
+      payment: { ...(getLocalBookings().find((item) => item._id === bookingId)?.payment || {}), amount: totalAmount, method: paymentMethod, status: 'paid', paidAt: new Date().toISOString() }
+    }
+  });
+  const recordText = [
+    `Doctor: ${booking?.doctor?.name || ''}`,
+    `Diagnosis: ${booking?.prescription?.diagnosis || ''}`,
+    `Prescription: ${(booking?.prescription?.medicines || []).map((item) => `${item.name} ${item.days || ''} days`).join(', ')}`,
+    `Medicines dispensed: ${billItems.map((item) => `${item.name} x${item.quantity}`).join(', ')}`,
+    `Bill amount: INR ${totalAmount}`,
+    `Payment: ${paymentMethod}`,
+    `Follow-up: ${booking?.prescription?.followUpRequired ? `${booking.prescription.followUpDate} - ${booking.prescription.followUpNotes}` : 'Not required'}`
+  ].join('\n');
+  saveLocalMedicalRecord({
+    email: booking?.patientEmail,
+    type: 'visit-summary',
+    title: `Visit summary · token #${booking?.tokenNumber || ''}`,
+    sourceText: recordText,
+    aiSummary: recordText
+  });
+  addLocalNotification({ email: booking?.patientEmail, title: 'Payment completed', message: `Bill ${pharmacyBill.billNumber} paid. Visit record saved.`, type: 'success' });
+  return booking;
 };
 
 export const getSlotAvailability = (doctor, slotId, date) => {
