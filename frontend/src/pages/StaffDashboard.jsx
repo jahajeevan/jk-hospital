@@ -1,5 +1,5 @@
 import { Activity, Bell, ClipboardCheck, FileText, Pill, Plus, ReceiptText, Search, Stethoscope, UserCheck } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import MetricCard from '../components/MetricCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -35,8 +35,8 @@ const patientName = (booking) => booking.patientDetails?.name || booking.patient
 const patientPhone = (booking) => booking.patientDetails?.phone || booking.patient?.phone || '';
 const statusOpenForReception = new Set(['approved', 'confirmed', 'payment_submitted', 'arrived', 'in_progress', 'prescription_generated', 'pharmacy_pending']);
 
-export default function StaffDashboard() {
-  const [tab, setTab] = useState('reception');
+export default function StaffDashboard({ initialTab = 'reception' }) {
+  const [tab, setTab] = useState(initialTab);
   const [bookings, setBookings] = useState(() => getLocalBookings());
   const [doctors, setDoctors] = useState(() => getLocalDoctors());
   const [inventory, setInventory] = useState(() => getLocalInventory());
@@ -53,6 +53,10 @@ export default function StaffDashboard() {
     setDoctors(getLocalDoctors());
     setInventory(getLocalInventory());
   };
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
 
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
