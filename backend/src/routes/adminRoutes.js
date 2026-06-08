@@ -2,6 +2,7 @@ import express from 'express';
 import {
   allBookings,
   deleteDoctor,
+  deleteSlot,
   markDoctorLeave,
   overview,
   updateAppointmentStatus,
@@ -19,6 +20,7 @@ router.get('/bookings', allBookings);
 router.post('/doctors', requirePermission(PERMISSIONS.DOCTORS_MANAGE), upsertDoctor);
 router.put('/doctors/:id', requirePermission(PERMISSIONS.DOCTORS_MANAGE), upsertDoctor);
 router.delete('/doctors/:id', requirePermission(PERMISSIONS.DOCTORS_MANAGE), deleteDoctor);
+router.delete('/slots/:slotId', requirePermission(PERMISSIONS.DOCTORS_MANAGE), deleteSlot);
 router.patch('/appointments/:id/status', requirePermission(PERMISSIONS.APPOINTMENTS_MANAGE), updateAppointmentStatus);
 router.patch('/doctors/:id/leave', requirePermission(PERMISSIONS.DOCTORS_MANAGE), markDoctorLeave);
 

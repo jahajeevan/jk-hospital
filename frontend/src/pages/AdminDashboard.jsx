@@ -10,14 +10,28 @@ import MetricCard from '../components/MetricCard.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
 import { DEPARTMENTS } from '../utils/localStore.js';
-import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor, updateDoctorSlot, createDoctor as createDoctorApi, updateAppointment } from '../services/apiService.js';
+import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor, updateDoctorSlot, createDoctor as createDoctorApi, updateAppointment, deleteDoctor as deleteDoctorApi, deleteSlot as deleteSlotApi } from '../services/apiService.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { MIN_CONSULTATION_FEE, normalizeFee } from '../utils/paymentRules.js';
 import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl } from '../utils/validation.js';
 
 const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const palette = ['#147bd1', '#10b981', '#f59e0b', '#e05283'];
-const defaultDoctorForm = { name: '', specialty: '', specialization: '', qualification: '', department: 'General Medicine', experience: '', avatar: '', fee: 500, bio: '', isAvailable: true };
+const defaultDoctorForm = { 
+  name: '', 
+  specialty: '', 
+  specialization: '', 
+  qualification: '', 
+  department: 'General Medicine', 
+  experience: '', 
+  avatar: '', 
+  fee: 500, 
+  bio: '', 
+  isAvailable: true,
+  email: '',
+  password: '',
+  confirmPassword: ''
+};
 const defaultSlotForm = {
   doctorId: '',
   label: '',
@@ -278,6 +292,41 @@ export default function AdminDashboard() {
     updateSlot(doctorId, slotId, 'bookedTokens', Math.max((slot.tokenLimit || 0) - remaining, 0));
   };
 
+  const handleDeleteDoctor = async (doctor) => {
+    if (!confirm(`Delete Dr. ${doctor.name}? This will also delete all their slots and associated data.`)) {
+      return;
+    }
+    try {
+      await deleteDoctorApi(doctor._id);
+      setDoctorList(prev => prev.filter(d => d._id !== doctor._id));
+      toast.success(`Dr. ${doctor.name} deleted successfully`);
+    } catch (error) {
+      console.error('Error deleting doctor:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete doctor');
+    }
+  };
+
+  const handleDeleteSlot = async (doctorId, slotId, slotLabel) => {
+    if (!confirm(`Delete slot "${slotLabel}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteSlotApi(slotId);
+      const doctor = doctorList.find(d => d._id === doctorId);
+      if (doctor) {
+        const nextDoctor = {
+          ...doctor,
+          slots: doctor.slots.filter(s => s._id !== slotId)
+        };
+        setDoctorList(prev => prev.map(d => d._id === doctorId ? nextDoctor : d));
+        toast.success('Slot deleted successfully');
+      }
+    } catch (error) {
+      console.error('Error deleting slot:', error);
+      toast.error('Failed to delete slot');
+    }
+  };
+
   const openDoctorForm = () => {
     setDoctorForm(defaultDoctorForm);
     setDoctorFormOpen(true);
@@ -291,6 +340,16 @@ export default function AdminDashboard() {
     if (!isValidHttpUrl(doctorForm.avatar)) return 'Enter a valid doctor image URL';
     if (normalizeFee(doctorForm.fee) < MIN_CONSULTATION_FEE) return `Fee must be at least INR ${MIN_CONSULTATION_FEE}`;
     if (doctorForm.bio.trim().length < 12) return 'Profile must be at least 12 characters';
+    
+    // Email validation
+    if (!doctorForm.email.trim()) return 'Hospital email is required';
+    if (!doctorForm.email.includes('@jkhospital.com')) return 'Email must be in format: name@jkhospital.com';
+    
+    // Password validation
+    if (!doctorForm.password) return 'Password is required';
+    if (doctorForm.password.length < 8) return 'Password must be at least 8 characters';
+    if (doctorForm.password !== doctorForm.confirmPassword) return 'Passwords do not match';
+    
     return '';
   };
 
@@ -301,7 +360,6 @@ export default function AdminDashboard() {
     
     try {
       const doctor = await createDoctorApi({
-        ...doctorForm,
         name: doctorForm.name.trim(),
         specialty: doctorForm.specialty.trim(),
         specialization: (doctorForm.specialization || doctorForm.specialty).trim(),
@@ -311,6 +369,9 @@ export default function AdminDashboard() {
         avatar: doctorForm.avatar.trim(),
         bio: doctorForm.bio.trim(),
         fee: normalizeFee(doctorForm.fee),
+        isAvailable: doctorForm.isAvailable,
+        email: doctorForm.email.trim().toLowerCase(),
+        password: doctorForm.password,
         slots: []
       });
       
@@ -319,6 +380,13 @@ export default function AdminDashboard() {
       setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
       
       setDoctorFormOpen(false);
+      setDoctorForm(defaultDoctorForm);
+      toast.success(`Dr. ${doctor.name} added successfully. Login credentials: ${doctor.email} / [password]`);
+    } catch (error) {
+      console.error('Error creating doctor:', error);
+      toast.error(error.response?.data?.message || 'Failed to add doctor');
+    }
+  };
       setDoctorForm(defaultDoctorForm);
       toast.success(`${doctor.name} added`);
     } catch (error) {
@@ -634,7 +702,7 @@ export default function AdminDashboard() {
                   <button type="button" onClick={() => openSlotForm(doctor._id)} className="btn-secondary px-3 py-2"><Plus size={15} /> Add regular slot</button>
                   <button type="button" onClick={() => openSlotForm(doctor._id, new Date().toISOString().slice(0, 10))} className="btn-secondary px-3 py-2"><CalendarPlus size={15} /> Add today-only slot</button>
                   <button onClick={() => markLeave(doctor)} className="btn-secondary px-3 py-2">Leave mode</button>
-                  <button type="button" onClick={() => deleteDoctor(doctor)} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"><Trash2 size={15} className="mr-1 inline" /> Delete doctor</button>
+                  <button type="button" onClick={() => handleDeleteDoctor(doctor)} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"><Trash2 size={15} className="mr-1 inline" /> Delete doctor</button>
                 </div>
 
                 <div className="mt-4 grid gap-3">
@@ -706,13 +774,22 @@ export default function AdminDashboard() {
                           <p className="text-wrap-anywhere text-xs text-slate-500">
                             {slot.date ? `Only visible on ${slot.date}` : 'Regular slot'} · future booking {slot.availableUntil ? `until ${slot.availableUntil}` : 'has no end date'} · same-day cutoff {slot.advanceBookingMinutes ?? 60} min
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => updateSlot(doctor._id, slot._id, 'isActive', !slot.isActive)}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-bold sm:shrink-0 ${slot.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}
-                          >
-                            {slot.isActive ? 'Active' : 'Hidden'}
-                          </button>
+                          <div className="flex gap-2 sm:shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => updateSlot(doctor._id, slot._id, 'isActive', !slot.isActive)}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-bold ${slot.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}
+                            >
+                              {slot.isActive ? 'Active' : 'Hidden'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSlot(doctor._id, slot._id, slot.label)}
+                              className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700"
+                            >
+                              <Trash2 size={14} className="mr-1 inline" /> Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -957,6 +1034,51 @@ export default function AdminDashboard() {
             Profile
             <textarea className="field mt-1 min-h-24" required value={doctorForm.bio} onChange={(event) => setDoctorForm((value) => ({ ...value, bio: event.target.value }))} />
           </label>
+          
+          <hr className="my-2" />
+          
+          <p className="text-xs font-bold text-slate-700">Doctor Login Credentials</p>
+          
+          <label className="text-xs font-bold text-slate-500">
+            Hospital Email (e.g., firstname@jkhospital.com)
+            <input 
+              className="field mt-1" 
+              required 
+              type="email" 
+              placeholder="name@jkhospital.com"
+              value={doctorForm.email} 
+              onChange={(event) => setDoctorForm((value) => ({ ...value, email: event.target.value }))} 
+            />
+          </label>
+          
+          <label className="text-xs font-bold text-slate-500">
+            Password (min 8 characters)
+            <input 
+              className="field mt-1" 
+              required 
+              type="password" 
+              placeholder="Create a strong password"
+              value={doctorForm.password} 
+              onChange={(event) => setDoctorForm((value) => ({ ...value, password: event.target.value }))} 
+            />
+          </label>
+          
+          <label className="text-xs font-bold text-slate-500">
+            Confirm Password
+            <input 
+              className="field mt-1" 
+              required 
+              type="password" 
+              placeholder="Re-enter password"
+              value={doctorForm.confirmPassword} 
+              onChange={(event) => setDoctorForm((value) => ({ ...value, confirmPassword: event.target.value }))} 
+            />
+          </label>
+          
+          <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-800">
+            ℹ️ Doctor will use these credentials to login to the Doctor Dashboard. Email must end with @jkhospital.com.
+          </p>
+          
           <p className="rounded-lg bg-medical-50 p-3 text-xs text-medical-800">
             Slots are added separately after the doctor is saved, so the system never creates random OP timings.
           </p>

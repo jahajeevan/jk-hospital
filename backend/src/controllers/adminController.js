@@ -1,6 +1,11 @@
+import bcrypt from 'bcryptjs';
 import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
 import { sendStatusEmail } from '../services/emailService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+
+const hashPassword = async (password) => {
+  return bcrypt.hash(password, 12);
+};
 
 export const overview = asyncHandler(async (_req, res) => {
   const [
@@ -82,11 +87,14 @@ export const allBookings = asyncHandler(async (_req, res) => {
 
 export const upsertDoctor = asyncHandler(async (req, res) => {
   const slots = req.body.slots || [];
+  const { email, password } = req.body;
   const bodyCopy = { ...req.body };
   delete bodyCopy.slots;
+  delete bodyCopy.password; // Don't store password in doctor table
 
   let doctor;
   if (req.params.id) {
+    // UPDATE existing doctor
     const { data: docList, error: docErr } = await supabase
       .from('doctors')
       .update(toSnakeObj(bodyCopy))
@@ -95,12 +103,33 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
     if (docErr) throw docErr;
     doctor = toCamelObj(docList?.[0]);
   } else {
+    // CREATE new doctor + user account
     const { data: docList, error: docErr } = await supabase
       .from('doctors')
       .insert(toSnakeObj(bodyCopy))
       .select('*');
     if (docErr) throw docErr;
     doctor = toCamelObj(docList?.[0]);
+
+    // Create doctor user account for login
+    if (email && password) {
+      const hashedPassword = await hashPassword(password);
+      const { error: userErr } = await supabase
+        .from('users')
+        .insert(toSnakeObj({
+          email: email.trim().toLowerCase(),
+          password: hashedPassword,
+          name: bodyCopy.name,
+          role: 'doctor',
+          isVerified: true,
+          linkedDoctorId: doctor.id,
+          passwordChangedAt: new Date()
+        }));
+
+      if (userErr && userErr.code !== '23505') { // 23505 = unique constraint (email exists)
+        throw userErr;
+      }
+    }
   }
 
   // Sync slots to relational table
@@ -128,9 +157,23 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
 });
 
 export const deleteDoctor = asyncHandler(async (req, res) => {
+  // Delete doctor's user account too
+  await supabase.from('users').delete().eq('linkedDoctorId', req.params.id);
+  
+  // Delete doctor slots
+  await supabase.from('doctor_slots').delete().eq('doctor_id', req.params.id);
+  
+  // Delete doctor
   const { error } = await supabase.from('doctors').delete().eq('id', req.params.id);
   if (error) throw error;
-  res.json({ message: 'Doctor deleted' });
+  res.json({ message: 'Doctor and associated data deleted' });
+});
+
+export const deleteSlot = asyncHandler(async (req, res) => {
+  const { slotId } = req.params;
+  const { error } = await supabase.from('doctor_slots').delete().eq('id', slotId);
+  if (error) throw error;
+  res.json({ message: 'Slot deleted' });
 });
 
 export const updateAppointmentStatus = asyncHandler(async (req, res) => {

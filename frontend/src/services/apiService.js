@@ -113,6 +113,26 @@ export const updateDoctorSlot = async (doctorId, slotId, updates) => {
   }
 };
 
+export const deleteDoctor = async (doctorId) => {
+  try {
+    const response = await apiClient.delete(`/admin/doctors/${doctorId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error deleting doctor ${doctorId}:`, error);
+    throw error;
+  }
+};
+
+export const deleteSlot = async (slotId) => {
+  try {
+    const response = await apiClient.delete(`/admin/slots/${slotId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error deleting slot ${slotId}:`, error);
+    throw error;
+  }
+};
+
 // ============ APPOINTMENTS (Bookings) ============
 export const fetchAppointments = async (filters = {}) => {
   try {
