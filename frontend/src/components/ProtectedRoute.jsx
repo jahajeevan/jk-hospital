@@ -35,12 +35,31 @@ function AdminAccessDenied() {
 
 export default function ProtectedRoute({ children, admin = false, roles = [], allowIncompleteProfile = false }) {
   const { user, isAdmin, needsProfileCompletion } = useAuth();
-  if (!user) return <Navigate to={admin ? '/admin/login' : '/login'} replace />;
+  
+  // Check for doctor token in sessionStorage
+  const doctorUser = sessionStorage.getItem('jk_doctor_user') ? 
+    JSON.parse(sessionStorage.getItem('jk_doctor_user')) : null;
+  
+  const currentUser = user || doctorUser;
+  
+  if (!currentUser) {
+    if (admin) return <Navigate to="/admin/login" replace />;
+    if (roles.includes('doctor')) return <Navigate to="/doctor/login" replace />;
+    return <Navigate to="/login" replace />;
+  }
+
   if (admin) {
     if (!isAdmin) return <AdminAccessDenied />;
     return children;
   }
-  if (needsProfileCompletion && !allowIncompleteProfile) return <Navigate to="/complete-profile" replace />;
-  if (roles.length && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+
+  if (needsProfileCompletion && !allowIncompleteProfile) {
+    return <Navigate to="/complete-profile" replace />;
+  }
+
+  if (roles.length && !roles.includes(currentUser.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 }

@@ -12,6 +12,22 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Check for doctor user in sessionStorage
+  const doctorUser = sessionStorage.getItem('jk_doctor_user') ? 
+    JSON.parse(sessionStorage.getItem('jk_doctor_user')) : null;
+  const currentUser = user || doctorUser;
+  
+  const handleLogout = () => {
+    if (doctorUser) {
+      sessionStorage.removeItem('jk_doctor_token');
+      sessionStorage.removeItem('jk_doctor_user');
+      navigate('/');
+      setOpen(false);
+    } else {
+      handleLogout();
+    }
+  };
   const liquidNavLabels = new Set(['Home', 'Patient', 'Book', 'Reception', 'Doctor', 'Pharmacy', 'Staff', 'AI', 'Doctors', 'Services', 'Contact', 'Admin']);
   const linkClass = ({ isActive }) =>
     `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive ? 'bg-white/60 text-medical-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_24px_rgba(13,99,173,0.1)] ring-1 ring-medical-200/70 backdrop-blur-xl' : 'text-slate-600 hover:bg-white/50 hover:text-medical-700 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] hover:backdrop-blur-xl'}`;
@@ -79,8 +95,8 @@ export default function Navbar() {
     ]
   };
 
-  const links = user
-    ? roleLinks[user.role] || roleLinks.patient
+  const links = currentUser
+    ? roleLinks[currentUser.role] || roleLinks.patient
     : [
         ['/', Activity, 'Home'],
         ['/ai', Bot, 'AI'],
@@ -160,9 +176,14 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Link to="/login" className="btn-secondary nav-direct-auth px-3 py-2">
-                  Login
-                </Link>
+                <div className="hidden sm:flex sm:gap-2">
+                  <Link to="/login" className="btn-secondary nav-direct-auth px-3 py-2">
+                    Login
+                  </Link>
+                  <Link to="/doctor/login" className="btn-ghost-light nav-direct-auth px-3 py-2 text-xs">
+                    Doctor Login
+                  </Link>
+                </div>
                 <Link to="/signup" className="btn-primary nav-direct-auth whitespace-nowrap px-3 py-2">
                   Sign up
                 </Link>
@@ -220,7 +241,7 @@ export default function Navbar() {
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      logout();
+                      handleLogout();
                     }}
                     className="mobile-nav-action danger"
                   >
@@ -229,7 +250,8 @@ export default function Navbar() {
                   </button>
                 ) : (
                   <>
-                    <Link to="/login" className="mobile-nav-action secondary" onClick={() => setOpen(false)}>Login</Link>
+                    <Link to="/login" className="mobile-nav-action secondary" onClick={() => setOpen(false)}>Patient Login</Link>
+                    <Link to="/doctor/login" className="mobile-nav-action secondary" onClick={() => setOpen(false)}>Doctor Login</Link>
                     <Link to="/signup" className="mobile-nav-action primary" onClick={() => setOpen(false)}>Sign up</Link>
                   </>
                 )}

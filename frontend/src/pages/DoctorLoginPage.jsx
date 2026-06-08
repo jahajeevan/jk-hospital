@@ -1,22 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext.jsx';
-import api from '../api/client.js';
 import { Lock, Mail } from 'lucide-react';
+import api from '../api/client.js';
 
 export default function DoctorLoginPage() {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!loading && user?.role === 'doctor') {
-      navigate('/staff');
-    }
-  }, [user, loading, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -32,17 +24,23 @@ export default function DoctorLoginPage() {
         password
       });
 
-      if (response.data?.user?.role !== 'doctor') {
+      const user = response.data?.user;
+      if (user?.role !== 'doctor') {
         toast.error('This account is not authorized as a doctor');
         setIsLoading(false);
         return;
       }
 
+      // Store doctor login token in sessionStorage
+      sessionStorage.setItem('jk_doctor_token', response.data?.token || '');
+      sessionStorage.setItem('jk_doctor_user', JSON.stringify(user));
+
       toast.success('Login successful');
-      navigate('/staff?tab=doctor');
+      navigate('/doctor-dashboard');
     } catch (error) {
       console.error('Login error:', error);
-      toast.error(error.response?.data?.message || 'Login failed');
+      const message = error.response?.data?.message || error.message || 'Login failed';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

@@ -86,6 +86,14 @@ api.interceptors.response.use(
 );
 
 api.interceptors.request.use(async (config) => {
+  // Check for doctor token first (local authentication)
+  const doctorToken = sessionStorage.getItem('jk_doctor_token');
+  if (doctorToken) {
+    config.headers.Authorization = `Bearer ${doctorToken}`;
+    return config;
+  }
+
+  // Fall back to Clerk token
   const clerkToken = await window.jkGetClerkToken?.();
   if (clerkToken && !clerkToken.startsWith('local-')) {
     config.headers.Authorization = `Bearer ${clerkToken}`;

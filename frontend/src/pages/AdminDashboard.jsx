@@ -387,13 +387,6 @@ export default function AdminDashboard() {
       toast.error(error.response?.data?.message || 'Failed to add doctor');
     }
   };
-      setDoctorForm(defaultDoctorForm);
-      toast.success(`${doctor.name} added`);
-    } catch (error) {
-      console.error('Error creating doctor:', error);
-      toast.error('Failed to add doctor');
-    }
-  };
 
   const openSlotForm = (doctorId, date = '') => {
     const doctor = doctorList.find((item) => item._id === doctorId);
@@ -475,19 +468,17 @@ export default function AdminDashboard() {
   };
 
   const deleteDoctor = async (doctor) => {
-    const hasBookings = bookings.some((booking) => booking.doctor?._id === doctor._id);
-    if (hasBookings) {
-      toast.error('This doctor has bookings. Mark unavailable instead of deleting.');
+    if (!window.confirm(`Are you sure you want to delete ${doctor.name}? This will also delete all their slots and associated appointments.`)) {
       return;
     }
     try {
-      // Mark doctor as unavailable instead of deleting
-      const updated = await updateDoctor(doctor._id, { isAvailable: false });
-      setDoctorList(prev => prev.map(d => d._id === doctor._id ? updated : d));
-      toast.success(`${doctor.name} removed`);
+      await deleteDoctorApi(doctor._id);
+      setDoctorList(prev => prev.filter(d => d._id !== doctor._id));
+      setSelectedDoctor(null);
+      toast.success(`${doctor.name} deleted successfully`);
     } catch (error) {
       console.error('Error deleting doctor:', error);
-      toast.error('Failed to remove doctor');
+      toast.error(error.response?.data?.message || 'Failed to delete doctor');
     }
   };
 
