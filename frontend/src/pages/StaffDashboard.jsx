@@ -158,7 +158,7 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   });
   const pharmacyQueue = bookings.filter((item) => ['prescription_generated', 'pharmacy_pending'].includes(item.status));
   const completedToday = bookings.filter((item) => item.status === 'completed');
-  const alerts = getInventoryAlerts();
+  const alerts = []; // Inventory alerts are now loaded from API via notifications
   const selectedWalkInDoctor = doctors.find((doctor) => doctor._id === walkIn.doctorId) || null;
   const walkInSlotOptions = selectedWalkInDoctor ? getWalkInSlotOptions(selectedWalkInDoctor, walkIn.date) : [];
   const selectedBillBooking = bookings.find((booking) => booking._id === billBookingId);
