@@ -11,6 +11,35 @@ import './styles.css';
 import './features/payment-verification/styles/payment-verification.css';
 import { setVoiceFeedbackEnabled } from './features/payment-verification/utils/voiceFeedback.js';
 
+// Clear all legacy localStorage entries (migration from localStorage to Clerk/state)
+// This ensures old data doesn't persist after app update
+if (typeof window !== 'undefined') {
+  const keysToRemove = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
+    .filter(key => key && key.startsWith('jk_'));
+  keysToRemove.forEach(key => {
+    try {
+      localStorage.removeItem(key);
+      console.log(`Cleared legacy localStorage key: ${key}`);
+    } catch (e) {
+      console.warn(`Failed to clear localStorage key ${key}:`, e);
+    }
+  });
+}
+
+// Also clear sessionStorage (was used for temporary data)
+if (typeof window !== 'undefined') {
+  const sessionKeysToRemove = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i))
+    .filter(key => key && key.startsWith('jk_'));
+  sessionKeysToRemove.forEach(key => {
+    try {
+      sessionStorage.removeItem(key);
+      console.log(`Cleared legacy sessionStorage key: ${key}`);
+    } catch (e) {
+      console.warn(`Failed to clear sessionStorage key ${key}:`, e);
+    }
+  });
+}
+
 // Voice preference defaults to enabled (no localStorage)
 setVoiceFeedbackEnabled(true);
 
