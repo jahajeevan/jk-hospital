@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireUser } from '../middleware/auth.js';
+import { requireUser } from '../middleware/authMiddleware.js';
 import prescriptionController from '../controllers/prescriptionController.js';
 
 const router = express.Router();

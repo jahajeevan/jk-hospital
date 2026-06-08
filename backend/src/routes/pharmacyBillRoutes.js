@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireUser, requireAdmin } from '../middleware/auth.js';
+import { requireUser, requireAdmin } from '../middleware/authMiddleware.js';
 import billController from '../controllers/pharmacyBillController.js';
 
 const router = express.Router();
