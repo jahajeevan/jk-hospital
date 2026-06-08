@@ -12,7 +12,7 @@ export const createRefreshToken = async ({ user, req, familyId = crypto.randomUU
   const { data: records, error } = await supabase
     .from('refresh_tokens')
     .insert(toSnakeObj({
-      user: user._id,
+      user: user.id,
       tokenHash: hashToken(token),
       familyId,
       deviceId,

@@ -3,6 +3,8 @@ import { CalendarPlus, Eye, Image, LockKeyhole, MailCheck, Plus, ShieldCheck, St
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api/client.js';
 import MetricCard from '../components/MetricCard.jsx';
 import Modal from '../components/ui/Modal.jsx';
@@ -73,6 +75,9 @@ const buildOverviewFromBookings = (items, refunds = []) => {
 };
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/admin/login" replace />;
+  
   const [unlocked, setUnlocked] = useState(() => isAdminSessionOpen());
   const [password, setPassword] = useState('');
   const [selectedProof, setSelectedProof] = useState(null);
