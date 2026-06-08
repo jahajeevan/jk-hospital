@@ -9,17 +9,10 @@ import Modal from '../components/ui/Modal.jsx';
 import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
 import {
   DEPARTMENTS,
-  createLocalDoctor,
-  createLocalSlot,
-  getLocalBookings,
   getLocalDoctors,
-  getLocalRefunds,
-  removeLocalDoctor,
-  saveLocalDoctor,
-  saveLocalSlot,
-  updateLocalBookingStatus,
-  updateLocalRefundStatus
+  getLocalRefunds
 } from '../utils/localStore.js';
+import { fetchAppointments, fetchDoctors } from '../services/apiService.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { MIN_CONSULTATION_FEE, normalizeFee } from '../utils/paymentRules.js';
 import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl } from '../utils/validation.js';
@@ -89,55 +82,48 @@ export default function AdminDashboard() {
   const [selectedProof, setSelectedProof] = useState(null);
   const [overview, setOverview] = useState({ stats: { appointments: 0, patients: 0, pendingRefunds: 0, revenue: 0 } });
   const [bookings, setBookings] = useState([]);
-  const [doctorList, setDoctorList] = useState(() => getLocalDoctors());
+  const [doctorList, setDoctorList] = useState([]);
   const [adminTab, setAdminTab] = useState('overview');
   const [bookingQuery, setBookingQuery] = useState('');
   const [refunds, setRefunds] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [doctorFormOpen, setDoctorFormOpen] = useState(false);
-  const [doctorForm, setDoctorForm] = useState(defaultDoctorForm);
   const [slotFormOpen, setSlotFormOpen] = useState(false);
-  const [slotForm, setSlotForm] = useState(defaultSlotForm);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadLocal = () => {
-      const localBookings = getLocalBookings();
-      const localDoctors = getLocalDoctors();
-      const localRefunds = getLocalRefunds();
-      if (cancelled) return;
-      setBookings(localBookings);
-      setDoctorList(localDoctors);
-      setRefunds(localRefunds);
-      setOverview(buildOverviewFromBookings(localBookings, localRefunds));
-    };
-
     const loadServer = async () => {
       try {
-        const [overviewResponse, bookingsResponse] = await Promise.all([
-          api.get('/admin/overview'),
-          api.get('/admin/bookings')
+        setLoading(true);
+        const [appointmentsData, doctorsData] = await Promise.all([
+          fetchAppointments(),
+          fetchDoctors()
         ]);
         if (cancelled) return;
-        const serverBookings = bookingsResponse.data?.appointments || [];
-        const localRefunds = getLocalRefunds();
-        setBookings(serverBookings);
-        setRefunds(localRefunds);
-        setDoctorList(getLocalDoctors());
-        setOverview(overviewResponse.data?.stats ? overviewResponse.data : buildOverviewFromBookings(serverBookings, localRefunds));
+        setBookings(Array.isArray(appointmentsData) ? appointmentsData : []);
+        setDoctorList(Array.isArray(doctorsData) ? doctorsData : []);
+        setRefunds(getLocalRefunds());
+        
+        const stats = buildOverviewFromBookings(
+          Array.isArray(appointmentsData) ? appointmentsData : [],
+          getLocalRefunds()
+        );
+        setOverview(stats);
       } catch (error) {
-        loadLocal();
-        toast.error(error.response?.data?.message || 'Could not load live admin data. Showing this browser data.');
+        console.error('Error loading admin data:', error);
+        toast.error('Could not load live admin data');
+        setBookings([]);
+        setDoctorList(getLocalDoctors());
+        setRefunds(getLocalRefunds());
+      } finally {
+        setLoading(false);
       }
     };
 
     void loadServer();
-    window.addEventListener('storage', loadServer);
-    window.addEventListener('jk-local-sync', loadServer);
     return () => {
       cancelled = true;
-      window.removeEventListener('storage', loadServer);
-      window.removeEventListener('jk-local-sync', loadServer);
     };
   }, []);
 

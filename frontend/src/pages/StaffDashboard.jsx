@@ -7,10 +7,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api/client.js';
 import {
   DEPARTMENTS,
-  createWalkInBooking,
-  getInventoryAlerts,
   getLocalAuditLogs,
-  getLocalBookings,
   getLocalDoctors,
   getLocalInventory,
   getLocalNotifications,
@@ -22,6 +19,7 @@ import {
   savePrescriptionForBooking,
   updateAppointmentWorkflow
 } from '../utils/localStore.js';
+import { fetchUserAppointments, fetchAppointments, fetchDoctors } from '../services/apiService.js';
 
 const tabs = [
   ['reception', 'Reception'],
@@ -74,9 +72,10 @@ const statusOpenForReception = new Set(['approved', 'confirmed', 'payment_submit
 export default function StaffDashboard({ initialTab = 'reception', standalone = false }) {
   const { user } = useAuth();
   const [tab, setTab] = useState(initialTab);
-  const [bookings, setBookings] = useState(() => getLocalBookings());
-  const [doctors, setDoctors] = useState(() => getLocalDoctors());
-  const [inventory, setInventory] = useState(() => getLocalInventory());
+  const [bookings, setBookings] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [staffSection, setStaffSection] = useState('dashboard');
   const [walkIn, setWalkIn] = useState({ patientName: '', mobile: '', department: DEPARTMENTS[0], doctorId: '', date: todayLocal(), slotId: '' });
@@ -90,15 +89,24 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
 
   const loadServer = async () => {
     try {
-      const bookingsResponse = await api.get('/admin/bookings');
-      const serverBookings = bookingsResponse.data?.appointments || [];
-      setBookings(serverBookings);
-      setDoctors(getLocalDoctors());
+      setLoading(true);
+      let bookingsData = [];
+      if (user?.role === 'doctor') {
+        bookingsData = await fetchUserAppointments();
+      } else {
+        bookingsData = await fetchAppointments();
+      }
+      const doctorsData = await fetchDoctors();
+      setBookings(Array.isArray(bookingsData) ? bookingsData : []);
+      setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
       setInventory(getLocalInventory());
     } catch (error) {
-      setBookings(getLocalBookings());
+      console.error('Error loading staff data:', error);
+      setBookings([]);
       setDoctors(getLocalDoctors());
       setInventory(getLocalInventory());
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -107,32 +115,8 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   };
 
   useEffect(() => {
-    let cancelled = false;
-    const loadServerSync = async () => {
-      try {
-        const bookingsResponse = await api.get('/admin/bookings');
-        if (cancelled) return;
-        const serverBookings = bookingsResponse.data?.appointments || [];
-        setBookings(serverBookings);
-        setDoctors(getLocalDoctors());
-        setInventory(getLocalInventory());
-      } catch (error) {
-        if (cancelled) return;
-        setBookings(getLocalBookings());
-        setDoctors(getLocalDoctors());
-        setInventory(getLocalInventory());
-      }
-    };
-
-    void loadServerSync();
-    window.addEventListener('storage', loadServerSync);
-    window.addEventListener('jk-local-sync', loadServerSync);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('storage', loadServerSync);
-      window.removeEventListener('jk-local-sync', loadServerSync);
-    };
-  }, []);
+    void loadServer();
+  }, [user?.role]);
 
   useEffect(() => {
     setTab(initialTab);

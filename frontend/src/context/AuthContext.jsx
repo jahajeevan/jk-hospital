@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
-import { hydrateLocalStore } from '../utils/localStore.js';
 import { clearUserSession, readUserSession } from '../utils/userStore.js';
 
 const AuthContext = createContext(null);
@@ -35,7 +34,6 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const boot = async () => {
-      await hydrateLocalStore();
       setLocalSession(readUserSession());
       setBooting(false);
     };

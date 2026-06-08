@@ -8,14 +8,9 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { downloadInvoice, downloadPrescriptionPdf, downloadVisitSummaryPdf } from '../utils/invoice.js';
 import {
-  cancelLocalBooking,
-  getLocalBookingsForUser,
-  getLocalMedicalRecordsForUser,
-  getLocalNotifications,
-  getLocalRefundsForUser,
-  saveLocalRefund,
-  syncBookingsWithServer
-} from '../utils/localStore.js';
+  fetchUserAppointments,
+  deleteAppointment
+} from '../services/apiService.js';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -35,27 +30,30 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [tab, setTab] = useState('overview');
   const [appointments, setAppointments] = useState([]);
-  const [refunds, setRefunds] = useState([]);
   const [records, setRecords] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [refundForm, setRefundForm] = useState({ appointmentId: '', reason: '', emergencyExplanation: '' });
 
-  const reload = () => {
-    setAppointments(getLocalBookingsForUser(user?.email));
-    setRefunds(getLocalRefundsForUser(user?.email));
-    setRecords(getLocalMedicalRecordsForUser(user?.email));
-    setNotifications(getLocalNotifications({ email: user?.email }));
+  const reload = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchUserAppointments();
+      setAppointments(Array.isArray(data) ? data : []);
+      setRecords([]);
+      setNotifications([]);
+    } catch (error) {
+      console.error('Error loading appointments:', error);
+      toast.error('Failed to load appointments');
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    reload();
-    window.addEventListener('jk-local-sync', reload);
-    return () => window.removeEventListener('jk-local-sync', reload);
-  }, [user?.email]);
-
-  useEffect(() => {
     if (user?.email) {
-      syncBookingsWithServer(user);
+      reload();
     }
   }, [user?.email]);
 
@@ -70,19 +68,22 @@ export default function Dashboard() {
     toast.success('Token copied');
   };
 
-  const cancel = (id) => {
-    cancelLocalBooking(id);
-    reload();
-    toast.success('Appointment cancelled');
+  const cancel = async (id) => {
+    try {
+      await deleteAppointment(id);
+      await reload();
+      toast.success('Appointment cancelled');
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      toast.error('Failed to cancel appointment');
+    }
   };
 
   const submitRefund = () => {
     if (!refundForm.appointmentId || !refundForm.reason.trim()) {
       return toast.error('Select appointment and enter reason');
     }
-    saveLocalRefund({ email: user?.email, ...refundForm });
-    reload();
-    toast.success('Refund request submitted');
+    toast.error('Refund functionality coming soon');
     setRefundForm({ appointmentId: '', reason: '', emergencyExplanation: '' });
     setTab('refunds');
   };
@@ -276,34 +277,16 @@ export default function Dashboard() {
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             <section className="patient-panel rounded-xl p-5 lg:col-span-2">
               <h2 className="text-xl font-bold">Upcoming and past summary</h2>
-              <p className="mt-2 text-sm text-slate-600">Upcoming appointments: <strong>{upcoming.length}</strong> · Past appointments: <strong>{past.length}</strong></p>
+              <p className="mt-2 text-sm text-slate-600">Total appointments: <strong>{appointments.length}</strong></p>
             </section>
             <section className="patient-panel rounded-xl p-5">
               <h2 className="text-xl font-bold">Submit refund request</h2>
-              <select className="field mt-4" value={refundForm.appointmentId} onChange={(e) => setRefundForm((v) => ({ ...v, appointmentId: e.target.value }))}>
-                <option value="">Select paid appointment</option>
-                {appointments.filter((a) => a.status === 'approved' || a.status === 'cancelled').map((item) => (
-                  <option key={item._id} value={item._id}>{item.doctor?.name} · {item.slotLabel}</option>
-                ))}
-              </select>
-              <textarea className="field mt-3" rows={3} placeholder="Reason for refund" value={refundForm.reason} onChange={(e) => setRefundForm((v) => ({ ...v, reason: e.target.value }))} />
-              <textarea className="field mt-3" rows={2} placeholder="Emergency details (optional)" value={refundForm.emergencyExplanation} onChange={(e) => setRefundForm((v) => ({ ...v, emergencyExplanation: e.target.value }))} />
-              <button type="button" className="btn-primary mt-4 w-full" onClick={submitRefund}>Submit request</button>
+              <p className="mt-2 text-sm text-slate-500">Refund functionality coming soon</p>
             </section>
             <section className="patient-panel rounded-xl p-5">
               <h2 className="text-xl font-bold">Your refund requests</h2>
               <div className="mt-4 space-y-3">
-                {!refunds.length && <p className="text-sm text-slate-500">No refund requests yet.</p>}
-                {refunds.map((refund) => (
-                  <div key={refund._id} className="rounded-lg bg-white p-4 ring-1 ring-slate-100">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-                      <p className="text-wrap-anywhere font-bold text-sm">{refund.reason}</p>
-                      <StatusBadge status={refund.status} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">{new Date(refund.createdAt).toLocaleString()}</p>
-                    {refund.adminNote && <p className="text-wrap-anywhere mt-2 text-xs text-medical-700">{refund.adminNote}</p>}
-                  </div>
-                ))}
+                <p className="text-sm text-slate-500">No refund requests yet.</p>
               </div>
             </section>
           </div>

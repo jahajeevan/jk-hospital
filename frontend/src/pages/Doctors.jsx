@@ -1,13 +1,32 @@
 import { Award, CalendarCheck, Search, Sparkles, UsersRound } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import DoctorCard from '../components/DoctorCard.jsx';
 import Reveal from '../components/Reveal.jsx';
-import { getLocalDoctors } from '../utils/localStore.js';
+import { fetchDoctors } from '../services/apiService.js';
 
 export default function Doctors() {
-  const doctors = getLocalDoctors();
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [specialty, setSpecialty] = useState('all');
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchDoctors();
+        setDoctors(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error loading doctors:', error);
+        toast.error('Failed to load doctors');
+        setDoctors([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDoctors();
+  }, []);
 
   const specialties = useMemo(() => ['all', ...new Set(doctors.map((d) => d.specialty))], [doctors]);
 

@@ -4,7 +4,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { createVerifiedLocalBooking } from '../../../utils/localStore.js';
+import { createAppointment } from '../../../services/apiService.js';
 import api from '../../../api/client.js';
 import { usePaymentAudio } from './usePaymentAudio.js';
 import {
@@ -48,7 +48,7 @@ export function usePaymentVerification(options = {}) {
   }, [audio]);
 
   /**
-   * Run server verification and create local booking.
+   * Run server verification and create appointment via API.
    * @param {{ booking: object, user: object, verifyFn: () => Promise<{ payment: object }> }} params
    */
   const runVerification = useCallback(
@@ -63,19 +63,14 @@ export function usePaymentVerification(options = {}) {
 
       try {
         const result = await verifyFn();
-        const appointment = createVerifiedLocalBooking({
+        const appointmentData = {
           doctor: booking.doctor,
           slot: booking.slot,
           date: booking.date,
           patient: booking.patient,
-          user,
           payment: result.payment
-        });
-        try {
-          await api.post('/appointments/sync', appointment);
-        } catch (syncErr) {
-          console.warn('Initial appointment sync failed, will retry on dashboard load:', syncErr);
-        }
+        };
+        const appointment = await createAppointment(appointmentData);
         setLastPayment(result.payment);
         setStatus('success');
         audio.stopAll();

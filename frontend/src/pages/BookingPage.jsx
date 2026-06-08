@@ -6,7 +6,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import AiVisitPrep from '../components/AiVisitPrep.jsx';
 import BookingStepper from '../components/BookingStepper.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { DEPARTMENTS, getLocalDoctors, getSlotAvailability } from '../utils/localStore.js';
+import { fetchDoctors, fetchDoctorSlots } from '../services/apiService.js';
+import { DEPARTMENTS, getSlotAvailability } from '../utils/localStore.js';
 import { normalizeFee } from '../utils/paymentRules.js';
 import { cleanIndianMobile, isValidIndianMobile } from '../utils/validation.js';
 
@@ -35,22 +36,36 @@ export default function BookingPage() {
   const { state } = useLocation();
   const { user } = useAuth();
   const [step, setStep] = useState(0);
-  const [doctors, setDoctors] = useState(() => getLocalDoctors());
-  const [department, setDepartment] = useState(() => state?.department || getLocalDoctors().find((item) => item._id === state?.doctorId)?.department || DEPARTMENTS[0]);
-  const [doctorId, setDoctorId] = useState(() => state?.doctorId || getLocalDoctors().find((item) => item.department === DEPARTMENTS[0])?._id);
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [department, setDepartment] = useState(DEPARTMENTS[0]);
+  const [doctorId, setDoctorId] = useState('');
   const [date, setDate] = useState(today);
   const [slotId, setSlotId] = useState('');
   const [patient, setPatient] = useState({ name: user?.name || '', age: '', gender: '', bloodGroup: '', phone: '', email: user?.email || '', address: '', emergencyContact: '', symptoms: '' });
 
   useEffect(() => {
-    const sync = () => setDoctors(getLocalDoctors());
-    sync();
-    window.addEventListener('jk-local-sync', sync);
-    return () => window.removeEventListener('jk-local-sync', sync);
-  }, []);
-
-  useEffect(() => {
-    if (state?.doctorId) setDoctorId(state.doctorId);
+    const loadDoctors = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchDoctors();
+        setDoctors(Array.isArray(data) ? data : []);
+        if (state?.doctorId) {
+          setDoctorId(state.doctorId);
+          const doctor = data.find((d) => d._id === state.doctorId);
+          if (doctor) setDepartment(doctor.department || DEPARTMENTS[0]);
+        } else {
+          const firstDoctor = data.find((d) => d.department === DEPARTMENTS[0]);
+          if (firstDoctor) setDoctorId(firstDoctor._id);
+        }
+      } catch (error) {
+        console.error('Error loading doctors:', error);
+        setDoctors([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDoctors();
   }, [state?.doctorId]);
 
   const departmentDoctors = doctors.filter((item) => item.department === department);

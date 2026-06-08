@@ -13,12 +13,13 @@ import {
   Ticket,
   Users
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import DoctorCard from '../components/DoctorCard.jsx';
 import TiltCard from '../components/TiltCard.jsx';
 import { galleryImages, testimonials } from '../data/demoData.js';
-import { getLocalDoctors } from '../utils/localStore.js';
+import { fetchDoctors } from '../services/apiService.js';
 import { fadeUp, staggerContainer } from '../utils/motion.js';
 
 const steps = [
@@ -62,8 +63,26 @@ const faqs = [
 ];
 
 export default function Home() {
-  const doctors = getLocalDoctors().slice(0, 3);
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [openFaq, setOpenFaq] = useState(0);
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchDoctors();
+        const doctorList = Array.isArray(data) ? data.slice(0, 3) : [];
+        setDoctors(doctorList);
+      } catch (error) {
+        console.error('Error loading doctors:', error);
+        setDoctors([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDoctors();
+  }, []);
 
   return (
     <main className="landing-page">
