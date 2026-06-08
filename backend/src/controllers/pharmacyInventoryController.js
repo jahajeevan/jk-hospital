@@ -1,6 +1,6 @@
 import * as inventoryService from '../services/pharmacyInventoryService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/authMiddleware.js';
 
 export const listInventory = asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 100);

@@ -1,6 +1,6 @@
 import * as auditService from '../services/auditLogsService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/authMiddleware.js';
 
 export const createAuditLog = asyncHandler(async (req, res) => {
   const {

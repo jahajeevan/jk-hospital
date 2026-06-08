@@ -1,6 +1,6 @@
 import * as billService from '../services/pharmacyBillService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/authMiddleware.js';
 
 export const createBill = asyncHandler(async (req, res) => {
   const { appointmentId, items, notes } = req.body;
