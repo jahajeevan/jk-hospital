@@ -13,6 +13,11 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import localMailRoutes from './routes/localMailRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import prescriptionRoutes from './routes/prescriptionRoutes.js';
+import medicalRecordsRoutes from './routes/medicalRecordsRoutes.js';
+import pharmacyInventoryRoutes from './routes/pharmacyInventoryRoutes.js';
+import pharmacyBillRoutes from './routes/pharmacyBillRoutes.js';
+import auditLogsRoutes from './routes/auditLogsRoutes.js';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 import { requestContext } from './middleware/requestContext.js';
 import { authLimiter, securityMiddleware } from './middleware/security.js';
@@ -57,6 +62,11 @@ const mountApiRoutes = (prefix) => {
   app.use(`${prefix}/notifications`, notificationRoutes);
   app.use(`${prefix}/local-mail`, localMailRoutes);
   app.use(`${prefix}/ai`, aiRoutes);
+  app.use(`${prefix}/prescriptions`, prescriptionRoutes);
+  app.use(`${prefix}/medical-records`, medicalRecordsRoutes);
+  app.use(`${prefix}/pharmacy-inventory`, pharmacyInventoryRoutes);
+  app.use(`${prefix}/pharmacy-bills`, pharmacyBillRoutes);
+  app.use(`${prefix}/audit-logs`, auditLogsRoutes);
 };
 
 mountApiRoutes('/api');
