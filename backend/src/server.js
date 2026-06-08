@@ -5,6 +5,7 @@ import { connectDB } from './config/db.js';
 import { env, validateEnv } from './config/env.js';
 import { initRealtime } from './modules/realtime/socket.js';
 import { logger } from './utils/logger.js';
+import { seedDoctors } from './services/seedService.js';
 
 validateEnv();
 
@@ -22,6 +23,9 @@ const shutdown = async (server, signal) => {
 };
 
 await connectDB();
+
+// Seed doctors into Supabase on startup
+await seedDoctors();
 
 const server = createServer(app);
 initRealtime(server);

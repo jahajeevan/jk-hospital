@@ -2,7 +2,8 @@ import { supabase, toCamelObj } from '../config/supabase.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getSlotAvailability } from '../services/tokenService.js';
 
-// Fallback doctors data
+// Fallback doctors data (same as seeded doctors)
+// These are used when Supabase is unavailable
 const FALLBACK_DOCTORS = [
   {
     id: 'doc-viji-001',
@@ -14,7 +15,9 @@ const FALLBACK_DOCTORS = [
     bio: 'Heart disease specialist with 15 years of experience',
     fee: 500,
     is_available: true,
-    avatar: null
+    avatar: null,
+    email: 'viji@jkhospital.com',
+    phone: '9876543210'
   },
   {
     id: 'doc-jahan-001',
@@ -26,7 +29,9 @@ const FALLBACK_DOCTORS = [
     bio: 'Brain and nervous system specialist with 12 years of experience',
     fee: 500,
     is_available: true,
-    avatar: null
+    avatar: null,
+    email: 'jahan@jkhospital.com',
+    phone: '9876543211'
   },
   {
     id: 'doc-sugu-001',
@@ -38,7 +43,9 @@ const FALLBACK_DOCTORS = [
     bio: 'Skin specialist with 10 years of experience',
     fee: 500,
     is_available: true,
-    avatar: null
+    avatar: null,
+    email: 'sugu@jkhospital.com',
+    phone: '9876543212'
   }
 ];
 
