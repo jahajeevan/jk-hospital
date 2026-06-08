@@ -358,6 +358,25 @@ export default function AdminDashboard() {
     return '';
   };
 
+  const seedDefaultDoctors = async () => {
+    try {
+      const response = await api.post('/seed/doctors');
+      if (response.data?.success) {
+        toast.success('✅ 3 doctors seeded to database!');
+        // Refresh doctors list
+        const freshDoctors = await fetchDoctors();
+        setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+      } else {
+        toast.success('Doctors seeding completed: ' + response.data?.message);
+        const freshDoctors = await fetchDoctors();
+        setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+      }
+    } catch (error) {
+      console.error('Seed error:', error);
+      toast.error(error.response?.data?.error || 'Failed to seed doctors');
+    }
+  };
+
   const createDoctor = async (event) => {
     event.preventDefault();
     const error = validateDoctorForm();
@@ -650,7 +669,10 @@ export default function AdminDashboard() {
               <p className="text-sm font-semibold text-medical-600">Live schedule studio</p>
               <h2 className="text-xl font-bold">Doctor and slot management</h2>
             </div>
-            <button type="button" onClick={openDoctorForm} className="btn-primary px-4 py-2"><Plus size={16} /> Add doctor</button>
+            <div className="flex gap-2">
+              <button type="button" onClick={seedDefaultDoctors} className="btn-secondary px-4 py-2" title="Seed 3 default doctors to database">🌱 Seed Doctors</button>
+              <button type="button" onClick={openDoctorForm} className="btn-primary px-4 py-2"><Plus size={16} /> Add doctor</button>
+            </div>
           </div>
           <div className="mt-4 space-y-5">
             {doctorList.map((doctor) => (
