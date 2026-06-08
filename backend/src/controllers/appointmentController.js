@@ -261,3 +261,164 @@ export const downloadInvoice = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${appointment.invoiceNumber}.pdf"`);
   res.send(buffer);
 });
+
+const mapMockDoctorId = async (mockId) => {
+  if (!mockId) return null;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(mockId)) return mockId;
+  
+  let name = '';
+  if (mockId === 'doc-vijay') name = 'Dr. Vijayakumar';
+  else if (mockId === 'doc-jaha') name = 'Dr. Jahajeevan';
+  else if (mockId === 'doc-suguna') name = 'Dr. Suguna';
+  
+  if (name) {
+    const { data } = await supabase.from('doctors').select('id').eq('name', name).limit(1);
+    if (data?.[0]?.id) return data[0].id;
+  }
+  
+  const { data } = await supabase.from('doctors').select('id').limit(1);
+  return data?.[0]?.id || mockId;
+};
+
+const mapMockSlotId = async (doctorId, mockSlotId) => {
+  if (!mockSlotId) return null;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(mockSlotId)) return mockSlotId;
+  
+  const { data } = await supabase.from('doctor_slots').select('id').eq('doctor_id', doctorId).limit(1);
+  return data?.[0]?.id || mockSlotId;
+};
+
+export const syncAppointment = asyncHandler(async (req, res) => {
+  const localApt = req.body;
+  if (!localApt?._id) {
+    const error = new Error('Invalid appointment data for sync');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const transactionId = localApt.payment?.transactionId || localApt.payment?.transaction_id || `TXN-${localApt._id}`;
+
+  const { data: existingApts } = await supabase
+    .from('appointments')
+    .select('*, payment:payments(*)')
+    .eq('patient_id', req.user._id)
+    .is('deleted_at', null);
+
+  const match = existingApts?.find((apt) => 
+    apt.id === localApt._id || 
+    apt.payment?.transaction_id === transactionId
+  );
+
+  if (match) {
+    let updatedApt = match;
+    const statusChanged = localApt.status && localApt.status !== match.status;
+    if (statusChanged) {
+      const { data: updatedApts, error: updateError } = await supabase
+        .from('appointments')
+        .update(toSnakeObj({ status: localApt.status }))
+        .eq('id', match.id)
+        .select('*');
+      if (updateError) throw updateError;
+      updatedApt = updatedApts[0];
+    }
+
+    if (localApt.pharmacyBill) {
+      const billId = localApt.pharmacyBill._id || localApt.pharmacyBill.billNumber;
+      const { data: existingPayments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('appointment_id', match.id)
+        .eq('transaction_id', `PHARM-${billId}`);
+
+      if (!existingPayments || existingPayments.length === 0) {
+        await supabase.from('payments').insert(toSnakeObj({
+          patientId: req.user._id,
+          appointmentId: match.id,
+          amount: localApt.pharmacyBill.totalAmount,
+          method: 'upi',
+          transactionId: `PHARM-${billId}`,
+          status: 'success',
+          currency: 'INR'
+        }));
+      }
+    }
+
+    return res.json({ success: true, appointment: toCamelObj(updatedApt), msg: 'Already synced and updated' });
+  }
+
+  const doctorId = localApt.doctor?._id || localApt.doctorId;
+  const slotId = localApt.slotId || localApt.slot?._id;
+
+  const mappedDoctorId = await mapMockDoctorId(doctorId);
+  const mappedSlotId = await mapMockSlotId(mappedDoctorId, slotId);
+
+  const { data: newPayments, error: paymentError } = await supabase
+    .from('payments')
+    .insert(toSnakeObj({
+      patientId: req.user._id,
+      amount: localApt.payment?.amount || 500,
+      method: localApt.payment?.method || 'stripe',
+      transactionId,
+      status: 'success',
+      currency: localApt.payment?.currency || 'INR',
+      stripeSessionId: localApt.payment?.stripeSessionId || localApt.payment?.stripe_session_id,
+      razorpayOrderId: localApt.payment?.razorpayOrderId || localApt.payment?.razorpay_order_id,
+      razorpayPaymentId: localApt.payment?.razorpayPaymentId || localApt.payment?.razorpay_payment_id
+    }))
+    .select('*');
+
+  if (paymentError) throw paymentError;
+  const paid = newPayments?.[0];
+
+  const { data: newAppointments, error: appointmentError } = await supabase
+    .from('appointments')
+    .insert(toSnakeObj({
+      patientId: req.user._id,
+      doctorId: mappedDoctorId,
+      slotId: mappedSlotId,
+      slotLabel: localApt.slotLabel || localApt.slot?.label || 'Consultation slot',
+      appointmentDate: localApt.appointmentDate || localApt.date,
+      tokenNumber: localApt.tokenNumber || 1,
+      queuePosition: localApt.queuePosition || 1,
+      estimatedWaitMinutes: localApt.estimatedWaitMinutes || 0,
+      patientName: localApt.patientDetails?.name || localApt.patientName,
+      patientAge: Number(localApt.patientDetails?.age || localApt.patient?.age || 30),
+      patientGender: localApt.patientDetails?.gender || localApt.patient?.gender || 'Male',
+      patientPhone: localApt.patientDetails?.phone || localApt.patient?.phone,
+      patientEmail: localApt.patientDetails?.email || localApt.patientEmail || req.user.email,
+      symptoms: localApt.patientDetails?.symptoms || localApt.patient?.symptoms || 'Consultation',
+      status: localApt.status || 'confirmed',
+      paymentId: paid.id,
+      invoiceNumber: localApt.invoiceNumber || `INV-${Date.now()}`
+    }))
+    .select('*');
+
+  if (appointmentError) {
+    await supabase.from('payments').delete().eq('id', paid.id);
+    throw appointmentError;
+  }
+
+  const newApt = newAppointments[0];
+  await supabase
+    .from('payments')
+    .update({ appointment_id: newApt.id })
+    .eq('id', paid.id);
+
+  if (localApt.pharmacyBill) {
+    const billId = localApt.pharmacyBill._id || localApt.pharmacyBill.billNumber;
+    await supabase.from('payments').insert(toSnakeObj({
+      patientId: req.user._id,
+      appointmentId: newApt.id,
+      amount: localApt.pharmacyBill.totalAmount,
+      method: 'upi',
+      transactionId: `PHARM-${billId}`,
+      status: 'success',
+      currency: 'INR'
+    }));
+  }
+
+  res.status(201).json({ success: true, appointment: toCamelObj(newApt) });
+});
+

@@ -11,9 +11,9 @@ const staffSeedAccounts = [
   ['admin@jkhospital.com', 'JK Hospital Admin', 'Admin@123', 'admin'],
   ['receptionist@jkhospital.com', 'JK Hospital Receptionist', 'Reception@123', 'receptionist'],
   ['pharmacist@jkhospital.com', 'JK Hospital Pharmacist', 'Pharmacy@123', 'pharmacist'],
-  ['ravi@jkhospital.com', 'Dr Ravi Kumar', 'Doctor@123', 'doctor'],
-  ['priya@jkhospital.com', 'Dr Priya Sharma', 'Doctor@123', 'doctor'],
-  ['arjun@jkhospital.com', 'Dr Arjun Menon', 'Doctor@123', 'doctor']
+  ['ravi@jkhospital.com', 'Dr. Vijayakumar', 'Doctor@123', 'doctor'],
+  ['priya@jkhospital.com', 'Dr. Jahajeevan', 'Doctor@123', 'doctor'],
+  ['arjun@jkhospital.com', 'Dr. Suguna', 'Doctor@123', 'doctor']
 ];
 
 const invalidateUsersCache = () => {

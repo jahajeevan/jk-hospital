@@ -5,6 +5,7 @@
 import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { createVerifiedLocalBooking } from '../../../utils/localStore.js';
+import api from '../../../api/client.js';
 import { usePaymentAudio } from './usePaymentAudio.js';
 import {
   confirmStripeSession,
@@ -70,6 +71,11 @@ export function usePaymentVerification(options = {}) {
           user,
           payment: result.payment
         });
+        try {
+          await api.post('/appointments/sync', appointment);
+        } catch (syncErr) {
+          console.warn('Initial appointment sync failed, will retry on dashboard load:', syncErr);
+        }
         setLastPayment(result.payment);
         setStatus('success');
         audio.stopAll();

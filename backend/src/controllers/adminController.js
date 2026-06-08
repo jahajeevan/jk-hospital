@@ -12,10 +12,19 @@ export const overview = asyncHandler(async (_req, res) => {
     supabase.from('appointments').select('*', { count: 'exact', head: true }).is('deleted_at', null),
     supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'patient').is('deleted_at', null),
     supabase.from('refund_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending').is('deleted_at', null),
-    supabase.from('payments').select('amount').eq('status', 'success').is('deleted_at', null)
+    supabase.from('payments').select('amount, transaction_id').eq('status', 'success').is('deleted_at', null)
   ]);
 
-  const revenue = paymentsData?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+  let consultationRevenue = 0;
+  let pharmacyRevenue = 0;
+  for (const p of paymentsData || []) {
+    if (p.transaction_id?.startsWith('PHARM-')) {
+      pharmacyRevenue += Number(p.amount || 0);
+    } else {
+      consultationRevenue += Number(p.amount || 0);
+    }
+  }
+  const revenue = consultationRevenue + pharmacyRevenue;
 
   // doctorOccupancy
   const { data: apts } = await supabase
@@ -48,7 +57,14 @@ export const overview = asyncHandler(async (_req, res) => {
     .slice(0, 14);
 
   res.json({
-    stats: { appointments: appointments || 0, patients: patients || 0, pendingRefunds: refunds || 0, revenue },
+    stats: {
+      appointments: appointments || 0,
+      patients: patients || 0,
+      pendingRefunds: refunds || 0,
+      revenue,
+      consultationRevenue,
+      pharmacyRevenue
+    },
     doctorOccupancy,
     dailyBookings
   });

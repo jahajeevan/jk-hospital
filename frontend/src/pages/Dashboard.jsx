@@ -13,7 +13,8 @@ import {
   getLocalMedicalRecordsForUser,
   getLocalNotifications,
   getLocalRefundsForUser,
-  saveLocalRefund
+  saveLocalRefund,
+  syncBookingsWithServer
 } from '../utils/localStore.js';
 
 const TABS = [
@@ -50,6 +51,12 @@ export default function Dashboard() {
     reload();
     window.addEventListener('jk-local-sync', reload);
     return () => window.removeEventListener('jk-local-sync', reload);
+  }, [user?.email]);
+
+  useEffect(() => {
+    if (user?.email) {
+      syncBookingsWithServer(user);
+    }
   }, [user?.email]);
 
   const active = appointments.find((item) => ['payment_submitted', 'confirmed', 'approved', 'rescheduled', 'arrived', 'in_progress', 'prescription_generated', 'pharmacy_pending', 'paid'].includes(item.status));

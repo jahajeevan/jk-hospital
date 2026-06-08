@@ -1,6 +1,7 @@
 import { doctors as baseDoctors } from '../data/demoData.js';
 import { normalizeFee } from './paymentRules.js';
 import { migratePlainKey, secureGet, secureSet } from './secureStore.js';
+import api from '../api/client.js';
 
 const DOCTORS_KEY = 'jk_local_doctors';
 const BOOKINGS_KEY = 'jk_local_bookings';
@@ -42,9 +43,9 @@ const isSlotEndedForDate = (slot, date, now = new Date()) => {
   return now > end;
 };
 const seededDoctorProfiles = {
-  'doc-vijay': { name: 'Dr Ravi Kumar', email: 'ravi@jkhospital.com', specialization: 'Orthopedics', department: 'Orthopedics' },
-  'doc-jaha': { name: 'Dr Priya Sharma', email: 'priya@jkhospital.com', specialization: 'Pediatrics', department: 'Pediatrics' },
-  'doc-suguna': { name: 'Dr Arjun Menon', email: 'arjun@jkhospital.com', specialization: 'General Medicine', department: 'General Medicine' }
+  'doc-vijay': { name: 'Dr. Vijayakumar', email: 'ravi@jkhospital.com', specialization: 'Orthopedics', department: 'Orthopedics' },
+  'doc-jaha': { name: 'Dr. Jahajeevan', email: 'priya@jkhospital.com', specialization: 'Pediatrics', department: 'Pediatrics' },
+  'doc-suguna': { name: 'Dr. Suguna', email: 'arjun@jkhospital.com', specialization: 'General Medicine', department: 'General Medicine' }
 };
 const isPlaceholderDoctor = (doctor) =>
   doctor?.name === 'Dr. New Doctor' ||
@@ -97,7 +98,17 @@ export const hydrateLocalStore = async () => {
     localStorage.setItem(VERSION_KEY, STORE_VERSION);
   }
 
-  doctorsCache = ((await secureGet(DOCTORS_KEY))?.map(normalizeDoctor) || seedDoctors()).filter((doctor) => !isPlaceholderDoctor(doctor));
+  let localDocs = await secureGet(DOCTORS_KEY);
+  try {
+    const response = await api.get('/doctors');
+    if (response.data?.doctors?.length) {
+      localDocs = response.data.doctors;
+    }
+  } catch (err) {
+    console.warn('Could not sync doctors from server, using local cache:', err.message);
+  }
+
+  doctorsCache = (localDocs?.map(normalizeDoctor) || seedDoctors()).filter((doctor) => !isPlaceholderDoctor(doctor));
   bookingsCache = (await secureGet(BOOKINGS_KEY)) || [];
   await persistDoctors();
   await persistBookings();
@@ -661,13 +672,18 @@ export const savePharmacyBillForBooking = ({ bookingId, pharmacistName = 'Pharma
     paymentTime: new Date().toISOString(),
     pharmacistName
   };
+  const originalBooking = getLocalBookings().find((item) => item._id === bookingId);
   const booking = updateAppointmentWorkflow(bookingId, 'completed', {
     role: 'pharmacist',
     actor: pharmacistName,
     note: `Paid by ${paymentMethod}`,
     extra: {
       pharmacyBill,
-      payment: { ...(getLocalBookings().find((item) => item._id === bookingId)?.payment || {}), amount: totalAmount, method: paymentMethod, status: 'paid', paidAt: new Date().toISOString() }
+      payment: {
+        ...(originalBooking?.payment || {}),
+        status: 'paid',
+        paidAt: new Date().toISOString()
+      }
     }
   });
   const recordText = [
@@ -722,3 +738,107 @@ export const getSlotAvailability = (doctor, slotId, date) => {
     estimatedWaitMinutes: Math.max(booked, 0) * 8
   };
 };
+
+export const syncBookingsWithServer = async (user) => {
+  if (!user?.email || user.role !== 'patient') return;
+  try {
+    const response = await api.get('/appointments/mine');
+    const serverBookings = response.data?.appointments || [];
+    
+    // Normalize server bookings to local format
+    const normalizedServer = serverBookings.map((apt) => ({
+      ...apt,
+      _id: apt.id || apt._id,
+      patientEmail: apt.patientEmail || user.email,
+      patientDetails: apt.patientDetails || { name: apt.patientName, phone: apt.patientPhone, email: apt.patientEmail },
+      timeline: apt.timeline || [
+        { label: 'Appointment booked', at: apt.createdAt || new Date().toISOString(), tone: 'green' }
+      ]
+    }));
+
+    let localBookings = getLocalBookings();
+    let updated = false;
+
+    // 1. Sync local bookings that are NOT on the server
+    for (const localApt of localBookings) {
+      if (normalizeEmail(localApt.patientEmail) === normalizeEmail(user.email) && localApt.payment?.method !== 'walk-in') {
+        const transactionId = localApt.payment?.transactionId;
+        const existsOnServer = normalizedServer.some(
+          (apt) => apt._id === localApt._id || (transactionId && apt.payment?.transactionId === transactionId)
+        );
+        if (!existsOnServer) {
+          try {
+            await api.post('/appointments/sync', localApt);
+            updated = true;
+          } catch (err) {
+            console.error('Failed to sync booking to server:', err);
+          }
+        }
+      }
+    }
+
+    // If we synced new ones to the server, refetch them to get server representation
+    let finalServerBookings = normalizedServer;
+    if (updated) {
+      const refetch = await api.get('/appointments/mine');
+      finalServerBookings = (refetch.data?.appointments || []).map((apt) => ({
+        ...apt,
+        _id: apt.id || apt._id,
+        patientEmail: apt.patientEmail || user.email,
+        patientDetails: apt.patientDetails || { name: apt.patientName, phone: apt.patientPhone, email: apt.patientEmail },
+        timeline: apt.timeline || [
+          { label: 'Appointment booked', at: apt.createdAt || new Date().toISOString(), tone: 'green' }
+        ]
+      }));
+    }
+
+    // 2. Merge server bookings into local bookings cache
+    const nonUserBookings = localBookings.filter(
+      (item) => normalizeEmail(item.patientEmail) !== normalizeEmail(user.email)
+    );
+
+    // Create a map of local bookings for the current user by transactionId or ID
+    const userLocalMap = new Map();
+    localBookings
+      .filter((item) => normalizeEmail(item.patientEmail) === normalizeEmail(user.email))
+      .forEach((item) => {
+        userLocalMap.set(item._id, item);
+        if (item.payment?.transactionId) {
+          userLocalMap.set(item.payment.transactionId, item);
+        }
+      });
+
+    const mergedUserBookings = [];
+    const seenServerIds = new Set();
+
+    // Map server bookings to local format, keeping any local-only status or info if newer, but server is source of truth
+    for (const serverApt of finalServerBookings) {
+      seenServerIds.add(serverApt._id);
+      const localMatch = userLocalMap.get(serverApt._id) || (serverApt.payment?.transactionId && userLocalMap.get(serverApt.payment.transactionId));
+      
+      mergedUserBookings.push({
+        ...localMatch,
+        ...serverApt,
+        _id: serverApt._id,
+        doctor: serverApt.doctor || localMatch?.doctor
+      });
+    }
+
+    // Keep local bookings that aren't on the server yet (e.g. offline or pending sync)
+    for (const localApt of localBookings) {
+      if (normalizeEmail(localApt.patientEmail) === normalizeEmail(user.email)) {
+        const transactionId = localApt.payment?.transactionId;
+        const mappedInServer = seenServerIds.has(localApt._id) || (transactionId && finalServerBookings.some(apt => apt.payment?.transactionId === transactionId));
+        if (!mappedInServer) {
+          mergedUserBookings.push(localApt);
+        }
+      }
+    }
+
+    // Save final merged bookings cache
+    saveLocalBookings([...nonUserBookings, ...mergedUserBookings]);
+  } catch (error) {
+    console.error('Failed to sync bookings with server:', error);
+  }
+};
+

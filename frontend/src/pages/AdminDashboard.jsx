@@ -54,18 +54,34 @@ const bookingPaymentAmount = (booking) => {
 
 const bookingPayment = (booking) => (Array.isArray(booking.payment) ? booking.payment[0] : booking.payment);
 
-const isOnlineVerifiedPayment = (booking) => ['stripe', 'razorpay'].includes(bookingPayment(booking)?.method);
+const isOnlineVerifiedPayment = (booking) => {
+  const payment = bookingPayment(booking);
+  if (!payment) return true;
+  return payment.method !== 'walk-in';
+};
 
-const buildOverviewFromBookings = (items, refunds = []) => ({
-  stats: {
-    appointments: items.length,
-    patients: new Set(items.map(bookingPatientEmail).filter(Boolean)).size,
-    pendingRefunds: refunds.filter((item) => item.status === 'pending').length,
-    revenue: items
-      .filter((item) => activeRevenueStatuses.has(item.status))
-      .reduce((sum, item) => sum + bookingPaymentAmount(item), 0)
-  }
-});
+const buildOverviewFromBookings = (items, refunds = []) => {
+  const consultationRevenue = items
+    .filter((item) => activeRevenueStatuses.has(item.status))
+    .reduce((sum, item) => sum + bookingPaymentAmount(item), 0);
+
+  const pharmacyRevenue = items
+    .filter((item) => item.status === 'completed' && item.pharmacyBill)
+    .reduce((sum, item) => sum + Number(item.pharmacyBill.totalAmount || 0), 0);
+
+  const revenue = consultationRevenue + pharmacyRevenue;
+
+  return {
+    stats: {
+      appointments: items.length,
+      patients: new Set(items.map(bookingPatientEmail).filter(Boolean)).size,
+      pendingRefunds: refunds.filter((item) => item.status === 'pending').length,
+      revenue,
+      consultationRevenue,
+      pharmacyRevenue
+    }
+  };
+};
 
 export default function AdminDashboard() {
   const [unlocked, setUnlocked] = useState(() => isAdminSessionOpen());
@@ -414,11 +430,13 @@ export default function AdminDashboard() {
         </div>
         <button type="button" onClick={() => { closeAdminSession(); setUnlocked(false); }} className="btn-secondary px-4 py-2">Lock panel</button>
       </div>
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <MetricCard label="Total appointments" value={overview.stats.appointments} />
         <MetricCard label="Patients" value={overview.stats.patients} tone="green" />
         <MetricCard label="Pending refunds" value={overview.stats.pendingRefunds} tone="amber" />
-        <MetricCard label="Revenue" value={`INR ${overview.stats.revenue}`} tone="rose" />
+        <MetricCard label="Consultation revenue" value={`INR ${overview.stats.consultationRevenue || 0}`} tone="blue" />
+        <MetricCard label="Pharmacy revenue" value={`INR ${overview.stats.pharmacyRevenue || 0}`} tone="rose" />
+        <MetricCard label="Total revenue" value={`INR ${overview.stats.revenue}`} tone="green" />
       </div>
 
       <motion.div className="mt-6 flex flex-wrap gap-2">
