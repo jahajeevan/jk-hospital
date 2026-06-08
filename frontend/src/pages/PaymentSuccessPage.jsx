@@ -23,8 +23,6 @@ export default function PaymentSuccessPage() {
   const appointment = state?.appointment;
 
   useEffect(() => {
-    const stored = localStorage.getItem('jk_payment_voice_enabled');
-    if (stored !== null) setVoiceFeedbackEnabled(stored === 'true');
     void playSuccessSound();
     triggerElectronHaptic('success');
     if (isVoiceFeedbackEnabled()) speakPaymentSuccess();

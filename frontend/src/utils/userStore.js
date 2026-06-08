@@ -1,33 +1,25 @@
 /**
- * User authentication utilities (stub implementation)
+ * User authentication utilities (Clerk-based, no localStorage)
  */
 
 export const authenticateUser = async (email, password) => {
-  // This is a stub - actual authentication is handled by Clerk
-  console.log('Authenticating user:', email);
+  // Authentication is handled by Clerk
+  console.log('Authentication handled by Clerk:', email);
   return { email, authenticated: true };
 };
 
+// Session is managed by Clerk context, no localStorage needed
 export const createUserSession = (user) => {
-  // Store user session in localStorage
-  localStorage.setItem('jk_user_session', JSON.stringify(user));
+  console.log('User session managed by Clerk:', user);
   return user;
 };
 
 export const readUserSession = () => {
-  try {
-    const session = localStorage.getItem('jk_user_session');
-    return session ? JSON.parse(session) : null;
-  } catch (error) {
-    console.error('Error reading user session:', error);
-    return null;
-  }
+  // Session is managed by AuthContext + Clerk
+  return null;
 };
 
 export const clearUserSession = () => {
-  try {
-    localStorage.removeItem('jk_user_session');
-  } catch (error) {
-    console.error('Error clearing user session:', error);
-  }
+  // Session cleared by Clerk signOut
+  console.log('User session cleared by Clerk');
 };

@@ -1,31 +1,27 @@
 /**
  * API Service Layer
  * All Supabase API calls go through this service
- * Replaces localStorage usage with backend API calls
+ * Uses Clerk authentication token instead of localStorage
  */
 
 import axios from 'axios';
 
 // Determine API URL based on environment
 const getApiUrl = () => {
-  // If explicitly set via env variable, use it
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // If running on localhost, use local backend (port 5001)
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5001/api';
   }
   
-  // For production domains, use Render backend
   if (window.location.hostname === 'www.jahajeevan.me' || 
       window.location.hostname === 'jahajeevan.me' ||
       window.location.hostname.includes('vercel.app')) {
     return 'https://jk-hospital-render.onrender.com/api';
   }
   
-  // Default fallback
   return 'http://localhost:5001/api';
 };
 
@@ -38,11 +34,17 @@ const apiClient = axios.create({
   },
 });
 
-// Add auth token to requests
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Add Clerk auth token to requests
+apiClient.interceptors.request.use(async (config) => {
+  try {
+    if (window.jkGetClerkToken) {
+      const token = await window.jkGetClerkToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+  } catch (error) {
+    console.debug('No Clerk token available');
   }
   return config;
 });
@@ -51,7 +53,7 @@ apiClient.interceptors.request.use((config) => {
 export const fetchDoctors = async () => {
   try {
     const response = await apiClient.get('/doctors');
-    return response.data || [];
+    return response.data?.doctors || [];
   } catch (error) {
     console.error('Error fetching doctors:', error);
     throw error;

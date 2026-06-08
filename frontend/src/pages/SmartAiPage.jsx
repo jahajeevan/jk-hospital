@@ -19,8 +19,6 @@ import api, { formatApiError } from '../api/client.js';
 import AiResponse from '../components/ai/AiResponse.jsx';
 
 const disclaimer = 'AI-generated response. This is for informational purposes only and not a substitute for professional medical advice.';
-const AI_MESSAGES_KEY = 'jk_ai_messages';
-const AI_SESSION_KEY = 'jk_ai_session_id';
 
 const createAiSessionId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 
@@ -61,20 +59,11 @@ const offlineResponse = () =>
 export default function SmartAiPage() {
   const [activeTool, setActiveTool] = useState('chat');
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState(() => {
-    const saved = JSON.parse(sessionStorage.getItem(AI_MESSAGES_KEY) || 'null');
-    return saved?.length ? saved : [initialAssistantMessage];
-  });
+  const [messages, setMessages] = useState([initialAssistantMessage]);
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState(null);
   const scrollRef = useRef(null);
-  const [sessionId, setSessionId] = useState(() => {
-    const saved = sessionStorage.getItem(AI_SESSION_KEY);
-    if (saved) return saved;
-    const next = createAiSessionId();
-    sessionStorage.setItem(AI_SESSION_KEY, next);
-    return next;
-  });
+  const [sessionId, setSessionId] = useState(() => createAiSessionId());
   const active = tools.find((tool) => tool.id === activeTool) || tools[0];
   const activeProvider = config?.providers?.find((item) => item.active);
 
@@ -84,7 +73,6 @@ export default function SmartAiPage() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    sessionStorage.setItem(AI_MESSAGES_KEY, JSON.stringify(messages.slice(-18)));
   }, [messages, loading]);
 
   const send = async (overrideText, overrideTool) => {
@@ -115,9 +103,7 @@ export default function SmartAiPage() {
   };
 
   const clearConversation = () => {
-    sessionStorage.removeItem(AI_MESSAGES_KEY);
     const nextSessionId = createAiSessionId();
-    sessionStorage.setItem(AI_SESSION_KEY, nextSessionId);
     setSessionId(nextSessionId);
     setMessages([initialAssistantMessage]);
     setInput('');

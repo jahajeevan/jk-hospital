@@ -5,8 +5,6 @@ import PremiumPaymentSection from '../features/payment-verification/components/P
 import { getSlotAvailability } from '../utils/localStore.js';
 import { isValidIndianMobile } from '../utils/validation.js';
 
-const BOOKING_KEY = 'jk_pending_payment_booking';
-
 const getBookingProblem = (booking) => {
   if (!booking) return 'Choose an appointment slot before payment.';
   if (!booking.doctor?._id) return 'Select a doctor before payment.';
@@ -28,18 +26,10 @@ const getBookingProblem = (booking) => {
 export default function PaymentPage() {
   const { state } = useLocation();
   const { user } = useAuth();
-  const [booking, setBooking] = useState(() => {
-    if (state) return state;
-    try {
-      return JSON.parse(localStorage.getItem(BOOKING_KEY));
-    } catch {
-      return null;
-    }
-  });
+  const [booking, setBooking] = useState(() => state || null);
 
   useEffect(() => {
     if (state) {
-      localStorage.setItem(BOOKING_KEY, JSON.stringify(state));
       setBooking(state);
     }
   }, [state]);

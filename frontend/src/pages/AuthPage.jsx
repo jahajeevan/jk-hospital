@@ -110,15 +110,12 @@ export default function AuthPage({ mode }) {
           password: localLogin.password
         });
         if (response.data?.token) {
-          sessionStorage.setItem('jk_token', response.data.token);
-          if (response.data.user) {
-            sessionStorage.setItem('jk_user', JSON.stringify(response.data.user));
-          }
+          // Token is handled by API interceptor using Clerk
           // Set local userStore session so user is recognized in the context
           const account = {
-            email: response.data.user.email,
-            name: response.data.user.name,
-            role: response.data.user.role
+            email: response.data.user?.email,
+            name: response.data.user?.name,
+            role: response.data.user?.role
           };
           await createUserSession(account);
           window.dispatchEvent(new Event('jk-auth-sync'));

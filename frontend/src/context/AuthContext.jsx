@@ -1,31 +1,8 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
 
-// Simple session management functions
-const readUserSession = () => {
-  try {
-    const session = localStorage.getItem('jk_user_session');
-    return session ? JSON.parse(session) : null;
-  } catch (error) {
-    console.error('Error reading user session:', error);
-    return null;
-  }
-};
-
-const clearUserSession = () => {
-  try {
-    localStorage.removeItem('jk_user_session');
-  } catch (error) {
-    console.error('Error clearing user session:', error);
-  }
-};
-
 const AuthContext = createContext(null);
-const BROWSER_SESSION_KEY = 'jk_browser_session_alive';
-const AI_MESSAGES_KEY = 'jk_ai_messages';
-const AI_SESSION_KEY = 'jk_ai_session_id';
-const PAYMENT_KEYS = ['jk_pending_payment_booking', 'jk_pending_payment_mode', 'jk_pending_payment_provider'];
 const adminEmails = new Set(
   String(import.meta.env.VITE_CLERK_ADMIN_EMAILS || 'admin@jkhospital.local')
     .split(',')
@@ -45,14 +22,10 @@ export function AuthProvider({ children }) {
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
   const [booting, setBooting] = useState(true);
-  const [localSession, setLocalSession] = useState(() => readUserSession());
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
-  const freshBrowserSession = useRef(sessionStorage.getItem(BROWSER_SESSION_KEY) !== 'active');
-  const previousUserId = useRef(null);
 
   useEffect(() => {
     const boot = async () => {
-      setLocalSession(readUserSession());
       setBooting(false);
     };
     void boot();
@@ -84,41 +57,14 @@ export function AuthProvider({ children }) {
         isVerified: Boolean(clerkUser.primaryEmailAddress?.verification?.status === 'verified' || clerkUser.emailAddresses?.length)
       }
     : null;
-  const localUser = localSession?.user ? { ...localSession.user, needsProfileCompletion: false } : null;
-  const user = clerkSessionUser || localUser;
+
+  const user = clerkSessionUser;
   const needsProfileCompletion = Boolean(clerkSessionUser?.needsProfileCompletion);
 
   const logout = async () => {
-    sessionStorage.removeItem(AI_MESSAGES_KEY);
-    sessionStorage.removeItem(AI_SESSION_KEY);
-    PAYMENT_KEYS.forEach((key) => {
-      sessionStorage.removeItem(key);
-      localStorage.removeItem(key);
-    });
-    sessionStorage.removeItem('jk_token');
-    sessionStorage.removeItem('jk_user');
-    localStorage.removeItem('jk_token');
-    localStorage.removeItem('jk_user');
-    clearUserSession();
-    setLocalSession(null);
     if (isSignedIn) await signOut();
     toast.success('Logged out securely');
   };
-
-  useEffect(() => {
-  if (!isLoaded) return;
-  sessionStorage.setItem(BROWSER_SESSION_KEY, 'active');
-}, [isLoaded]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    const currentUserId = isSignedIn ? clerkUser?.id || null : null;
-    if (currentUserId && previousUserId.current !== currentUserId) {
-      sessionStorage.removeItem(AI_MESSAGES_KEY);
-      sessionStorage.removeItem(AI_SESSION_KEY);
-    }
-    previousUserId.current = currentUserId;
-  }, [isLoaded, isSignedIn, clerkUser?.id]);
 
   useEffect(() => {
     window.jkGetClerkToken = getToken;
@@ -126,12 +72,6 @@ export function AuthProvider({ children }) {
       if (window.jkGetClerkToken === getToken) delete window.jkGetClerkToken;
     };
   }, [getToken]);
-
-  useEffect(() => {
-    const syncLocalSession = () => setLocalSession(readUserSession());
-    window.addEventListener('jk-auth-sync', syncLocalSession);
-    return () => window.removeEventListener('jk-auth-sync', syncLocalSession);
-  }, []);
 
   const authLoading = (!isLoaded && !clerkTimedOut) || booting;
 

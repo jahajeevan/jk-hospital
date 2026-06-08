@@ -11,8 +11,8 @@ import './styles.css';
 import './features/payment-verification/styles/payment-verification.css';
 import { setVoiceFeedbackEnabled } from './features/payment-verification/utils/voiceFeedback.js';
 
-const voicePref = localStorage.getItem('jk_payment_voice_enabled');
-setVoiceFeedbackEnabled(voicePref === null ? true : voicePref === 'true');
+// Voice preference defaults to enabled (no localStorage)
+setVoiceFeedbackEnabled(true);
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 

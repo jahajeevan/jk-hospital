@@ -70,31 +70,26 @@ api.interceptors.response.use(
       original._retry = true;
       try {
         const { data } = await api.post('/auth/refresh');
-        if (data?.token) sessionStorage.setItem('jk_token', data.token);
-        if (data?.user) sessionStorage.setItem('jk_user', JSON.stringify(data.user));
-        original.headers.Authorization = `Bearer ${data.token}`;
-        return api(original);
+        const newClerkToken = await window.jkGetClerkToken?.();
+        if (newClerkToken) {
+          original.headers.Authorization = `Bearer ${newClerkToken}`;
+          return api(original);
+        }
       } catch {
-        sessionStorage.removeItem('jk_token');
-        sessionStorage.removeItem('jk_user');
+        // Token refresh failed, user needs to re-authenticate via Clerk
+        console.error('Failed to refresh Clerk token');
       }
     }
     error.friendlyMessage = formatApiError(error);
-    const message = error.response?.data?.message || '';
-    if (message.toLowerCase().includes('jwt')) {
-      sessionStorage.removeItem('jk_token');
-      sessionStorage.removeItem('jk_user');
-      localStorage.removeItem('jk_token');
-      localStorage.removeItem('jk_user');
-    }
     return Promise.reject(error);
   }
 );
 
 api.interceptors.request.use(async (config) => {
   const clerkToken = await window.jkGetClerkToken?.();
-  const token = clerkToken || sessionStorage.getItem('jk_token');
-  if (token && !token.startsWith('local-')) config.headers.Authorization = `Bearer ${token}`;
+  if (clerkToken && !clerkToken.startsWith('local-')) {
+    config.headers.Authorization = `Bearer ${clerkToken}`;
+  }
   return config;
 });
 

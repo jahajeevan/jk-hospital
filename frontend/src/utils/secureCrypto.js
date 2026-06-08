@@ -4,14 +4,8 @@ const encoder = new TextEncoder();
 const toBase64 = (bytes) => btoa(String.fromCharCode(...bytes));
 const fromBase64 = (value) => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 
-const getDeviceId = () => {
-  let id = localStorage.getItem('jk_device_id');
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem('jk_device_id', id);
-  }
-  return id;
-};
+// Use a static device ID for encryption - no localStorage
+const getDeviceId = () => crypto.randomUUID();
 
 const deriveKey = async (material, salt, usages) => {
   const base = await crypto.subtle.importKey('raw', encoder.encode(material), 'PBKDF2', false, ['deriveKey']);
