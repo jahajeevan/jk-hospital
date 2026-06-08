@@ -13,9 +13,9 @@ const getApiUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // If running on localhost, use local backend
+  // If running on localhost, use local backend (port 5001)
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
+    return 'http://localhost:5001/api';
   }
   
   // For production domains, use Render backend
@@ -26,7 +26,7 @@ const getApiUrl = () => {
   }
   
   // Default fallback
-  return 'http://localhost:8000/api';
+  return 'http://localhost:5001/api';
 };
 
 const API_BASE_URL = getApiUrl();
