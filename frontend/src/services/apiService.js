@@ -1,58 +1,15 @@
 /**
  * API Service Layer
  * All Supabase API calls go through this service
- * Uses Clerk authentication token instead of localStorage
+ * Uses JWT token for staff/doctors and Clerk token for patients
  */
 
-import axios from 'axios';
-
-// Determine API URL based on environment
-const getApiUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:5001/api';
-  }
-  
-  if (window.location.hostname === 'www.jahajeevan.me' || 
-      window.location.hostname === 'jahajeevan.me' ||
-      window.location.hostname.includes('vercel.app')) {
-    return 'https://jk-hospital-render.onrender.com/api';
-  }
-  
-  return 'http://localhost:5001/api';
-};
-
-const API_BASE_URL = getApiUrl();
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add Clerk auth token to requests
-apiClient.interceptors.request.use(async (config) => {
-  try {
-    if (window.jkGetClerkToken) {
-      const token = await window.jkGetClerkToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-  } catch (error) {
-    console.debug('No Clerk token available');
-  }
-  return config;
-});
+import api from '../api/client.js';
 
 // ============ DOCTORS ============
 export const fetchDoctors = async () => {
   try {
-    const response = await apiClient.get('/doctors');
+    const response = await api.get('/doctors');
     const doctors = response.data?.doctors || [];
     console.log('Fetched doctors:', doctors.length > 0 ? `${doctors.length} doctors` : 'Empty list, using fallback');
     return doctors;
@@ -109,7 +66,7 @@ export const fetchDoctors = async () => {
 
 export const fetchDoctor = async (id) => {
   try {
-    const response = await apiClient.get(`/doctors/${id}`);
+    const response = await api.get(`/doctors/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching doctor ${id}:`, error);
@@ -119,7 +76,7 @@ export const fetchDoctor = async (id) => {
 
 export const fetchDoctorSlots = async (doctorId, date) => {
   try {
-    const response = await apiClient.get(`/doctors/${doctorId}/slots`, {
+    const response = await api.get(`/doctors/${doctorId}/slots`, {
       params: { date },
     });
     return response.data || [];
@@ -132,7 +89,7 @@ export const fetchDoctorSlots = async (doctorId, date) => {
 export const createDoctor = async (doctorData) => {
   try {
     console.log('Creating doctor with API data:', { ...doctorData, password: '[redacted]' });
-    const response = await apiClient.post('/admin/doctors', doctorData);
+    const response = await api.post('/admin/doctors', doctorData);
     console.log('Doctor created successfully:', response.data);
     return response.data;
   } catch (error) {
@@ -149,7 +106,7 @@ export const createDoctor = async (doctorData) => {
 
 export const updateDoctor = async (id, updates) => {
   try {
-    const response = await apiClient.patch(`/doctors/${id}`, updates);
+    const response = await api.patch(`/doctors/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating doctor ${id}:`, error);
@@ -159,7 +116,7 @@ export const updateDoctor = async (id, updates) => {
 
 export const updateDoctorSlot = async (doctorId, slotId, updates) => {
   try {
-    const response = await apiClient.patch(`/doctors/${doctorId}/slots/${slotId}`, updates);
+    const response = await api.patch(`/doctors/${doctorId}/slots/${slotId}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating slot ${slotId} for doctor ${doctorId}:`, error);
@@ -169,7 +126,7 @@ export const updateDoctorSlot = async (doctorId, slotId, updates) => {
 
 export const deleteDoctor = async (doctorId) => {
   try {
-    const response = await apiClient.delete(`/admin/doctors/${doctorId}`);
+    const response = await api.delete(`/admin/doctors/${doctorId}`);
     return response.data;
   } catch (error) {
     console.error(`Error deleting doctor ${doctorId}:`, error);
@@ -179,7 +136,7 @@ export const deleteDoctor = async (doctorId) => {
 
 export const deleteSlot = async (slotId) => {
   try {
-    const response = await apiClient.delete(`/admin/slots/${slotId}`);
+    const response = await api.delete(`/admin/slots/${slotId}`);
     return response.data;
   } catch (error) {
     console.error(`Error deleting slot ${slotId}:`, error);
@@ -190,7 +147,7 @@ export const deleteSlot = async (slotId) => {
 // ============ APPOINTMENTS (Bookings) ============
 export const fetchAppointments = async (filters = {}) => {
   try {
-    const response = await apiClient.get('/appointments', { params: filters });
+    const response = await api.get('/appointments', { params: filters });
     return response.data || [];
   } catch (error) {
     console.error('Error fetching appointments:', error);
@@ -200,7 +157,7 @@ export const fetchAppointments = async (filters = {}) => {
 
 export const fetchUserAppointments = async () => {
   try {
-    const response = await apiClient.get('/appointments/mine');
+    const response = await api.get('/appointments/mine');
     return response.data || [];
   } catch (error) {
     console.error('Error fetching user appointments:', error);
@@ -210,7 +167,7 @@ export const fetchUserAppointments = async () => {
 
 export const fetchAppointment = async (id) => {
   try {
-    const response = await apiClient.get(`/appointments/${id}`);
+    const response = await api.get(`/appointments/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching appointment ${id}:`, error);
@@ -220,7 +177,7 @@ export const fetchAppointment = async (id) => {
 
 export const createAppointment = async (appointmentData) => {
   try {
-    const response = await apiClient.post('/appointments', appointmentData);
+    const response = await api.post('/appointments', appointmentData);
     return response.data;
   } catch (error) {
     console.error('Error creating appointment:', error);
@@ -230,7 +187,7 @@ export const createAppointment = async (appointmentData) => {
 
 export const updateAppointment = async (id, updates) => {
   try {
-    const response = await apiClient.patch(`/appointments/${id}`, updates);
+    const response = await api.patch(`/appointments/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating appointment ${id}:`, error);
@@ -240,7 +197,7 @@ export const updateAppointment = async (id, updates) => {
 
 export const deleteAppointment = async (id) => {
   try {
-    const response = await apiClient.delete(`/appointments/${id}`);
+    const response = await api.delete(`/appointments/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error deleting appointment ${id}:`, error);
@@ -250,7 +207,7 @@ export const deleteAppointment = async (id) => {
 
 export const fetchRefundRequests = async (filters = {}) => {
   try {
-    const response = await apiClient.get('/refunds', { params: filters });
+    const response = await api.get('/refunds', { params: filters });
     return response.data || [];
   } catch (error) {
     console.error('Error fetching refund requests:', error);
@@ -260,7 +217,7 @@ export const fetchRefundRequests = async (filters = {}) => {
 
 export const updateRefundRequest = async (id, updates) => {
   try {
-    const response = await apiClient.patch(`/refunds/${id}`, updates);
+    const response = await api.patch(`/refunds/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating refund request ${id}:`, error);
@@ -271,7 +228,7 @@ export const updateRefundRequest = async (id, updates) => {
 // ============ PRESCRIPTIONS ============
 export const fetchPrescriptions = async () => {
   try {
-    const response = await apiClient.get('/prescriptions/mine');
+    const response = await api.get('/prescriptions/mine');
     return response.data || [];
   } catch (error) {
     console.error('Error fetching prescriptions:', error);
@@ -281,7 +238,7 @@ export const fetchPrescriptions = async () => {
 
 export const fetchPrescriptionsByAppointment = async (appointmentId) => {
   try {
-    const response = await apiClient.get(`/prescriptions/appointment/${appointmentId}`);
+    const response = await api.get(`/prescriptions/appointment/${appointmentId}`);
     return response.data || [];
   } catch (error) {
     console.error(`Error fetching prescriptions for appointment ${appointmentId}:`, error);
@@ -291,7 +248,7 @@ export const fetchPrescriptionsByAppointment = async (appointmentId) => {
 
 export const createPrescription = async (prescriptionData) => {
   try {
-    const response = await apiClient.post('/prescriptions', prescriptionData);
+    const response = await api.post('/prescriptions', prescriptionData);
     return response.data;
   } catch (error) {
     console.error('Error creating prescription:', error);
@@ -301,7 +258,7 @@ export const createPrescription = async (prescriptionData) => {
 
 export const updatePrescription = async (id, updates) => {
   try {
-    const response = await apiClient.patch(`/prescriptions/${id}`, updates);
+    const response = await api.patch(`/prescriptions/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating prescription ${id}:`, error);
@@ -312,7 +269,7 @@ export const updatePrescription = async (id, updates) => {
 // ============ MEDICAL RECORDS ============
 export const fetchMedicalRecords = async () => {
   try {
-    const response = await apiClient.get('/medical-records/mine');
+    const response = await api.get('/medical-records/mine');
     return response.data || [];
   } catch (error) {
     console.error('Error fetching medical records:', error);
@@ -322,7 +279,7 @@ export const fetchMedicalRecords = async () => {
 
 export const fetchMedicalRecord = async (id) => {
   try {
-    const response = await apiClient.get(`/medical-records/${id}`);
+    const response = await api.get(`/medical-records/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching medical record ${id}:`, error);
@@ -332,7 +289,7 @@ export const fetchMedicalRecord = async (id) => {
 
 export const createMedicalRecord = async (recordData) => {
   try {
-    const response = await apiClient.post('/medical-records', recordData);
+    const response = await api.post('/medical-records', recordData);
     return response.data;
   } catch (error) {
     console.error('Error creating medical record:', error);
@@ -342,7 +299,7 @@ export const createMedicalRecord = async (recordData) => {
 
 export const updateMedicalRecord = async (id, updates) => {
   try {
-    const response = await apiClient.patch(`/medical-records/${id}`, updates);
+    const response = await api.patch(`/medical-records/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating medical record ${id}:`, error);
@@ -353,7 +310,7 @@ export const updateMedicalRecord = async (id, updates) => {
 // ============ PHARMACY INVENTORY ============
 export const fetchPharmacyInventory = async (filters = {}) => {
   try {
-    const response = await apiClient.get('/pharmacy-inventory', { params: filters });
+    const response = await api.get('/pharmacy-inventory', { params: filters });
     return response.data || [];
   } catch (error) {
     console.error('Error fetching pharmacy inventory:', error);
@@ -363,7 +320,7 @@ export const fetchPharmacyInventory = async (filters = {}) => {
 
 export const fetchInventoryItem = async (id) => {
   try {
-    const response = await apiClient.get(`/pharmacy-inventory/${id}`);
+    const response = await api.get(`/pharmacy-inventory/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching inventory item ${id}:`, error);
@@ -373,7 +330,7 @@ export const fetchInventoryItem = async (id) => {
 
 export const createInventoryItem = async (itemData) => {
   try {
-    const response = await apiClient.post('/pharmacy-inventory', itemData);
+    const response = await api.post('/pharmacy-inventory', itemData);
     return response.data;
   } catch (error) {
     console.error('Error creating inventory item:', error);
@@ -383,7 +340,7 @@ export const createInventoryItem = async (itemData) => {
 
 export const updateInventoryItem = async (id, updates) => {
   try {
-    const response = await apiClient.patch(`/pharmacy-inventory/${id}`, updates);
+    const response = await api.patch(`/pharmacy-inventory/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating inventory item ${id}:`, error);
@@ -393,7 +350,7 @@ export const updateInventoryItem = async (id, updates) => {
 
 export const deleteInventoryItem = async (id) => {
   try {
-    const response = await apiClient.delete(`/pharmacy-inventory/${id}`);
+    const response = await api.delete(`/pharmacy-inventory/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error deleting inventory item ${id}:`, error);
@@ -404,7 +361,7 @@ export const deleteInventoryItem = async (id) => {
 // ============ PHARMACY BILLS ============
 export const fetchPharmacyBills = async (filters = {}) => {
   try {
-    const response = await apiClient.get('/pharmacy-bills', { params: filters });
+    const response = await api.get('/pharmacy-bills', { params: filters });
     return response.data || [];
   } catch (error) {
     console.error('Error fetching pharmacy bills:', error);
@@ -414,7 +371,7 @@ export const fetchPharmacyBills = async (filters = {}) => {
 
 export const fetchUserPharmacyBills = async () => {
   try {
-    const response = await apiClient.get('/pharmacy-bills/mine');
+    const response = await api.get('/pharmacy-bills/mine');
     return response.data || [];
   } catch (error) {
     console.error('Error fetching user pharmacy bills:', error);
@@ -424,7 +381,7 @@ export const fetchUserPharmacyBills = async () => {
 
 export const fetchPharmacyBill = async (id) => {
   try {
-    const response = await apiClient.get(`/pharmacy-bills/${id}`);
+    const response = await api.get(`/pharmacy-bills/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching pharmacy bill ${id}:`, error);
@@ -434,7 +391,7 @@ export const fetchPharmacyBill = async (id) => {
 
 export const createPharmacyBill = async (billData) => {
   try {
-    const response = await apiClient.post('/pharmacy-bills', billData);
+    const response = await api.post('/pharmacy-bills', billData);
     return response.data;
   } catch (error) {
     console.error('Error creating pharmacy bill:', error);
@@ -444,7 +401,7 @@ export const createPharmacyBill = async (billData) => {
 
 export const updatePharmacyBill = async (id, updates) => {
   try {
-    const response = await apiClient.patch(`/pharmacy-bills/${id}`, updates);
+    const response = await api.patch(`/pharmacy-bills/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating pharmacy bill ${id}:`, error);
@@ -455,7 +412,7 @@ export const updatePharmacyBill = async (id, updates) => {
 // ============ AUDIT LOGS ============
 export const fetchAuditLogs = async (filters = {}) => {
   try {
-    const response = await apiClient.get('/audit-logs', { params: filters });
+    const response = await api.get('/audit-logs', { params: filters });
     return response.data || [];
   } catch (error) {
     console.error('Error fetching audit logs:', error);
@@ -465,7 +422,7 @@ export const fetchAuditLogs = async (filters = {}) => {
 
 export const createAuditLog = async (logData) => {
   try {
-    const response = await apiClient.post('/audit-logs', logData);
+    const response = await api.post('/audit-logs', logData);
     return response.data;
   } catch (error) {
     console.error('Error creating audit log:', error);
@@ -476,7 +433,7 @@ export const createAuditLog = async (logData) => {
 // ============ NOTIFICATIONS ============
 export const fetchNotifications = async (filters = {}) => {
   try {
-    const response = await apiClient.get('/notifications', { params: filters });
+    const response = await api.get('/notifications', { params: filters });
     return response.data || [];
   } catch (error) {
     console.error('Error fetching notifications:', error);
@@ -486,7 +443,7 @@ export const fetchNotifications = async (filters = {}) => {
 
 export const createNotification = async (notificationData) => {
   try {
-    const response = await apiClient.post('/notifications', notificationData);
+    const response = await api.post('/notifications', notificationData);
     return response.data;
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -497,7 +454,7 @@ export const createNotification = async (notificationData) => {
 // ============ PAYMENTS ============
 export const createPayment = async (paymentData) => {
   try {
-    const response = await apiClient.post('/payments', paymentData);
+    const response = await api.post('/payments', paymentData);
     return response.data;
   } catch (error) {
     console.error('Error creating payment:', error);
@@ -507,7 +464,7 @@ export const createPayment = async (paymentData) => {
 
 export const fetchPayment = async (id) => {
   try {
-    const response = await apiClient.get(`/payments/${id}`);
+    const response = await api.get(`/payments/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching payment ${id}:`, error);
@@ -515,4 +472,4 @@ export const fetchPayment = async (id) => {
   }
 };
 
-export default apiClient;
+export default api;
