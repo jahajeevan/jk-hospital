@@ -18,9 +18,9 @@ const adminEmails = new Set(
 const staffRoleByEmail = {
   'receptionist@jkhospital.com': 'receptionist',
   'pharmacist@jkhospital.com': 'pharmacist',
-  'ravi@jkhospital.com': 'doctor',
-  'priya@jkhospital.com': 'doctor',
-  'arjun@jkhospital.com': 'doctor'
+  'viji@jkhospital.com': 'doctor',
+  'jahan@jkhospital.com': 'doctor',
+  'sugu@jkhospital.com': 'doctor'
 };
 
 export function AuthProvider({ children }) {

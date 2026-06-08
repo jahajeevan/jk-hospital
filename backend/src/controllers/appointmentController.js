@@ -300,11 +300,13 @@ export const syncAppointment = asyncHandler(async (req, res) => {
 
   const transactionId = localApt.payment?.transactionId || localApt.payment?.transaction_id || `TXN-${localApt._id}`;
 
-  const { data: existingApts } = await supabase
+  const query = supabase
     .from('appointments')
-    .select('*, payment:payments(*)')
-    .eq('patient_id', req.user._id)
-    .is('deleted_at', null);
+    .select('*, payment:payments(*)');
+  if (req.user.role === 'patient') {
+    query.eq('patient_id', req.user._id);
+  }
+  const { data: existingApts } = await query.is('deleted_at', null);
 
   const match = existingApts?.find((apt) => 
     apt.id === localApt._id || 
@@ -334,7 +336,7 @@ export const syncAppointment = asyncHandler(async (req, res) => {
 
       if (!existingPayments || existingPayments.length === 0) {
         await supabase.from('payments').insert(toSnakeObj({
-          patientId: req.user._id,
+          patientId: match.patient_id,
           appointmentId: match.id,
           amount: localApt.pharmacyBill.totalAmount,
           method: 'upi',
@@ -354,12 +356,43 @@ export const syncAppointment = asyncHandler(async (req, res) => {
   const mappedDoctorId = await mapMockDoctorId(doctorId);
   const mappedSlotId = await mapMockSlotId(mappedDoctorId, slotId);
 
+  // Resolve patientId dynamically to avoid constraint errors
+  let patientId = null;
+  const targetEmail = localApt.patientDetails?.email || localApt.patientEmail;
+  if (targetEmail) {
+    const { data: matchedUsers } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', targetEmail.trim().toLowerCase())
+      .limit(1);
+    if (matchedUsers?.[0]?.id) {
+      patientId = matchedUsers[0].id;
+    }
+  }
+  if (!patientId && req.user.role === 'patient') {
+    patientId = req.user._id;
+  }
+  if (!patientId) {
+    const { data: fallbackUsers } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', 'patient')
+      .limit(1);
+    if (fallbackUsers?.[0]?.id) {
+      patientId = fallbackUsers[0].id;
+    } else {
+      patientId = req.user._id;
+    }
+  }
+
+  const paymentMethod = localApt.payment?.method === 'walk-in' ? 'upi' : (localApt.payment?.method || 'stripe');
+
   const { data: newPayments, error: paymentError } = await supabase
     .from('payments')
     .insert(toSnakeObj({
-      patientId: req.user._id,
+      patientId,
       amount: localApt.payment?.amount || 500,
-      method: localApt.payment?.method || 'stripe',
+      method: paymentMethod,
       transactionId,
       status: 'success',
       currency: localApt.payment?.currency || 'INR',
@@ -375,7 +408,7 @@ export const syncAppointment = asyncHandler(async (req, res) => {
   const { data: newAppointments, error: appointmentError } = await supabase
     .from('appointments')
     .insert(toSnakeObj({
-      patientId: req.user._id,
+      patientId,
       doctorId: mappedDoctorId,
       slotId: mappedSlotId,
       slotLabel: localApt.slotLabel || localApt.slot?.label || 'Consultation slot',
@@ -387,7 +420,7 @@ export const syncAppointment = asyncHandler(async (req, res) => {
       patientAge: Number(localApt.patientDetails?.age || localApt.patient?.age || 30),
       patientGender: localApt.patientDetails?.gender || localApt.patient?.gender || 'Male',
       patientPhone: localApt.patientDetails?.phone || localApt.patient?.phone,
-      patientEmail: localApt.patientDetails?.email || localApt.patientEmail || req.user.email,
+      patientEmail: localApt.patientDetails?.email || localApt.patientEmail || targetEmail,
       symptoms: localApt.patientDetails?.symptoms || localApt.patient?.symptoms || 'Consultation',
       status: localApt.status || 'confirmed',
       paymentId: paid.id,
@@ -409,7 +442,7 @@ export const syncAppointment = asyncHandler(async (req, res) => {
   if (localApt.pharmacyBill) {
     const billId = localApt.pharmacyBill._id || localApt.pharmacyBill.billNumber;
     await supabase.from('payments').insert(toSnakeObj({
-      patientId: req.user._id,
+      patientId,
       appointmentId: newApt.id,
       amount: localApt.pharmacyBill.totalAmount,
       method: 'upi',

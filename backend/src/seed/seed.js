@@ -29,7 +29,13 @@ const seed = async () => {
 
   const { error: userErr } = await supabase.from('users').insert([
     toSnakeObj({ name: 'JK Hospital Admin', email: 'admin@jkhospital.local', password: adminPassword, role: 'admin', isVerified: true }),
-    toSnakeObj({ name: 'Demo Patient', email: 'patient@jkhospital.local', password: patientPassword, phone: '7845265507', role: 'patient', isVerified: true })
+    toSnakeObj({ name: 'Demo Patient', email: 'patient@jkhospital.local', password: patientPassword, phone: '7845265507', role: 'patient', isVerified: true }),
+    toSnakeObj({ name: 'JK Hospital Admin', email: 'admin@jkhospital.com', password: await hashPassword('Admin@123'), role: 'admin', isVerified: true }),
+    toSnakeObj({ name: 'JK Hospital Receptionist', email: 'receptionist@jkhospital.com', password: await hashPassword('Reception@123'), role: 'receptionist', isVerified: true }),
+    toSnakeObj({ name: 'JK Hospital Pharmacist', email: 'pharmacist@jkhospital.com', password: await hashPassword('Pharmacy@123'), role: 'pharmacist', isVerified: true }),
+    toSnakeObj({ name: 'Dr. Vijayakumar', email: 'viji@jkhospital.com', password: await hashPassword('Doctor@123'), role: 'doctor', isVerified: true }),
+    toSnakeObj({ name: 'Dr. Jahajeevan', email: 'jahan@jkhospital.com', password: await hashPassword('Doctor@123'), role: 'doctor', isVerified: true }),
+    toSnakeObj({ name: 'Dr. Suguna', email: 'sugu@jkhospital.com', password: await hashPassword('Doctor@123'), role: 'doctor', isVerified: true })
   ]);
   if (userErr) throw userErr;
 

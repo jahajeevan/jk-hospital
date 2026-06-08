@@ -43,9 +43,9 @@ const isSlotEndedForDate = (slot, date, now = new Date()) => {
   return now > end;
 };
 const seededDoctorProfiles = {
-  'doc-vijay': { name: 'Dr. Vijayakumar', email: 'ravi@jkhospital.com', specialization: 'Orthopedics', department: 'Orthopedics' },
-  'doc-jaha': { name: 'Dr. Jahajeevan', email: 'priya@jkhospital.com', specialization: 'Pediatrics', department: 'Pediatrics' },
-  'doc-suguna': { name: 'Dr. Suguna', email: 'arjun@jkhospital.com', specialization: 'General Medicine', department: 'General Medicine' }
+  'doc-vijay': { name: 'Dr. Vijayakumar', email: 'viji@jkhospital.com', specialization: 'Orthopedics', department: 'Orthopedics' },
+  'doc-jaha': { name: 'Dr. Jahajeevan', email: 'jahan@jkhospital.com', specialization: 'Pediatrics', department: 'Pediatrics' },
+  'doc-suguna': { name: 'Dr. Suguna', email: 'sugu@jkhospital.com', specialization: 'General Medicine', department: 'General Medicine' }
 };
 const isPlaceholderDoctor = (doctor) =>
   doctor?.name === 'Dr. New Doctor' ||

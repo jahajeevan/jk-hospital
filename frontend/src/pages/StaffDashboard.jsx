@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import MetricCard from '../components/MetricCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import api from '../api/client.js';
 import {
   DEPARTMENTS,
   createWalkInBooking,
@@ -87,11 +88,51 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const [doctorFilter, setDoctorFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
 
-  const reload = () => {
-    setBookings(getLocalBookings());
-    setDoctors(getLocalDoctors());
-    setInventory(getLocalInventory());
+  const loadServer = async () => {
+    try {
+      const bookingsResponse = await api.get('/admin/bookings');
+      const serverBookings = bookingsResponse.data?.appointments || [];
+      setBookings(serverBookings);
+      setDoctors(getLocalDoctors());
+      setInventory(getLocalInventory());
+    } catch (error) {
+      setBookings(getLocalBookings());
+      setDoctors(getLocalDoctors());
+      setInventory(getLocalInventory());
+    }
   };
+
+  const reload = () => {
+    void loadServer();
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadServerSync = async () => {
+      try {
+        const bookingsResponse = await api.get('/admin/bookings');
+        if (cancelled) return;
+        const serverBookings = bookingsResponse.data?.appointments || [];
+        setBookings(serverBookings);
+        setDoctors(getLocalDoctors());
+        setInventory(getLocalInventory());
+      } catch (error) {
+        if (cancelled) return;
+        setBookings(getLocalBookings());
+        setDoctors(getLocalDoctors());
+        setInventory(getLocalInventory());
+      }
+    };
+
+    void loadServerSync();
+    window.addEventListener('storage', loadServerSync);
+    window.addEventListener('jk-local-sync', loadServerSync);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('storage', loadServerSync);
+      window.removeEventListener('jk-local-sync', loadServerSync);
+    };
+  }, []);
 
   useEffect(() => {
     setTab(initialTab);
@@ -131,13 +172,18 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const walkInSlotOptions = selectedWalkInDoctor ? getWalkInSlotOptions(selectedWalkInDoctor, walkIn.date) : [];
   const selectedBillBooking = bookings.find((booking) => booking._id === billBookingId);
 
-  const submitWalkIn = () => {
+  const submitWalkIn = async () => {
     if (!walkIn.patientName.trim() || walkIn.mobile.length !== 10 || !walkIn.doctorId || !walkIn.slotId) {
       toast.error('Enter patient name, 10-digit mobile, doctor, and slot');
       return;
     }
     try {
-      createWalkInBooking(walkIn);
+      const booking = createWalkInBooking(walkIn);
+      try {
+        await api.post('/appointments/sync', booking);
+      } catch (syncErr) {
+        console.warn('Failed to sync walk-in booking to server:', syncErr);
+      }
       setWalkIn({ patientName: '', mobile: '', department: DEPARTMENTS[0], doctorId: '', date: todayLocal(), slotId: '' });
       reload();
       toast.success('Walk-in registered and marked arrived');
@@ -146,17 +192,27 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
     }
   };
 
-  const updateStatus = (id, status, role, note = '') => {
-    updateAppointmentWorkflow(id, status, { role, actor: role === 'doctor' ? 'Doctor' : 'Receptionist', note });
+  const updateStatus = async (id, status, role, note = '') => {
+    const updated = updateAppointmentWorkflow(id, status, { role, actor: role === 'doctor' ? 'Doctor' : 'Receptionist', note });
+    try {
+      await api.post('/appointments/sync', updated);
+    } catch (syncErr) {
+      console.warn('Failed to sync status update to server:', syncErr);
+    }
     reload();
     toast.success('Status updated');
   };
 
   const addRxMedicine = () => setRxForm((value) => ({ ...value, medicines: [...value.medicines, { name: '', morning: '', afternoon: '', night: '', days: '' }] }));
 
-  const submitPrescription = () => {
+  const submitPrescription = async () => {
     if (!rxBookingId || !rxForm.symptoms.trim()) return toast.error('Select patient and enter symptoms');
-    savePrescriptionForBooking({ bookingId: rxBookingId, doctorName: currentDoctor?.name || 'Doctor', diagnosis: '', advice: '', followUpRequired: false, followUpDate: '', followUpNotes: '', remarks: '', ...rxForm });
+    const updated = savePrescriptionForBooking({ bookingId: rxBookingId, doctorName: currentDoctor?.name || 'Doctor', diagnosis: '', advice: '', followUpRequired: false, followUpDate: '', followUpNotes: '', remarks: '', ...rxForm });
+    try {
+      await api.post('/appointments/sync', updated);
+    } catch (syncErr) {
+      console.warn('Failed to sync prescription to server:', syncErr);
+    }
     setRxBookingId('');
     setRxForm(emptyRx);
     reload();
@@ -172,9 +228,14 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
     setBillItems((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, medicineId, name: medicine?.name || '', totalCost: Number(medicine?.sellingPrice || 0) * Number(item.quantity || 1) } : item));
   };
 
-  const submitBill = () => {
+  const submitBill = async () => {
     if (!billBookingId || !billItems.some((item) => item.name && Number(item.quantity) > 0)) return toast.error('Select prescription and add medicines');
-    savePharmacyBillForBooking({ bookingId: billBookingId, items: billItems, paymentMethod: 'Cash' });
+    const updated = savePharmacyBillForBooking({ bookingId: billBookingId, items: billItems, paymentMethod: 'Cash' });
+    try {
+      await api.post('/appointments/sync', updated);
+    } catch (syncErr) {
+      console.warn('Failed to sync pharmacy bill to server:', syncErr);
+    }
     setBillBookingId('');
     setBillItems([{ medicineId: '', name: '', quantity: 1, totalCost: 0 }]);
     reload();
@@ -313,7 +374,23 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
                       <StatusBadge status={booking.status} />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {['approved', 'confirmed', 'payment_submitted'].includes(booking.status) && <button className="btn-secondary px-3 py-2 text-xs" onClick={() => { markPatientArrived(booking._id); reload(); toast.success('Patient marked arrived'); }}><UserCheck size={14} /> Mark arrived</button>}
+                      {['approved', 'confirmed', 'payment_submitted'].includes(booking.status) && (
+                        <button
+                          className="btn-secondary px-3 py-2 text-xs"
+                          onClick={async () => {
+                            const updated = markPatientArrived(booking._id);
+                            try {
+                              await api.post('/appointments/sync', updated);
+                            } catch (syncErr) {
+                              console.warn('Failed to sync arrival status to server:', syncErr);
+                            }
+                            reload();
+                            toast.success('Patient marked arrived');
+                          }}
+                        >
+                          <UserCheck size={14} /> Mark arrived
+                        </button>
+                      )}
                       <button className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700" onClick={() => updateStatus(booking._id, 'no_show', 'receptionist')}>No show</button>
                       <button className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700" onClick={() => updateStatus(booking._id, 'cancelled_by_hospital', 'receptionist')}>Cancel by hospital</button>
                     </div>

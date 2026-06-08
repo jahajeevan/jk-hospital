@@ -393,6 +393,11 @@ export default function AdminDashboard() {
       : 'Your appointment token is cancelled due to verification reasons. Please contact JK Hospital reception at 7845265507.';
     const updated = updateLocalBookingStatus(booking._id, status, adminNote);
     setBookings(getLocalBookings());
+    try {
+      await api.post('/appointments/sync', updated);
+    } catch (syncErr) {
+      console.warn('Failed to sync appointment status to server:', syncErr);
+    }
     await api.post('/local-mail/appointment-status', {
       email: booking.patientEmail,
       patientName: booking.patientName,

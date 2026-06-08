@@ -7,6 +7,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { authenticateUser, createUserSession } from '../utils/userStore.js';
+import api from '../api/client.js';
 
 const perks = [
   { icon: MailCheck, title: 'Email OTP', desc: 'Verified by Clerk' },
@@ -102,10 +103,38 @@ export default function AuthPage({ mode }) {
   const submitLocalLogin = async (event) => {
     event.preventDefault();
     try {
+      // 1. Try backend authentication first
+      try {
+        const response = await api.post('/auth/login', {
+          email: localLogin.email,
+          password: localLogin.password
+        });
+        if (response.data?.token) {
+          sessionStorage.setItem('jk_token', response.data.token);
+          if (response.data.user) {
+            sessionStorage.setItem('jk_user', JSON.stringify(response.data.user));
+          }
+          // Set local userStore session so user is recognized in the context
+          const account = {
+            email: response.data.user.email,
+            name: response.data.user.name,
+            role: response.data.user.role
+          };
+          await createUserSession(account);
+          window.dispatchEvent(new Event('jk-auth-sync'));
+          toast.success('Login successful');
+          navigate(dashboardForRole(response.data.user.role), { replace: true });
+          return;
+        }
+      } catch (backendErr) {
+        console.warn('Backend authentication failed, trying local fallback:', backendErr);
+      }
+
+      // 2. Fallback to client-side local authentication
       const account = await authenticateUser(localLogin.email, localLogin.password);
       const session = await createUserSession(account);
       window.dispatchEvent(new Event('jk-auth-sync'));
-      toast.success('Login successful');
+      toast.success('Login successful (offline mode)');
       navigate(dashboardForRole(session.user.role), { replace: true });
     } catch (error) {
       toast.error(error.message || 'Invalid email or password');

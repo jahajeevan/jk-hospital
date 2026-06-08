@@ -2,7 +2,7 @@ export const doctors = [
   {
     _id: 'doc-vijay',
     name: 'Dr. Vijayakumar',
-    email: 'ravi@jkhospital.com',
+    email: 'viji@jkhospital.com',
     specialty: 'Orthopedic Specialist',
     specialization: 'Orthopedics',
     qualification: 'MBBS, MS Ortho',
@@ -21,7 +21,7 @@ export const doctors = [
   {
     _id: 'doc-jaha',
     name: 'Dr. Jahajeevan',
-    email: 'priya@jkhospital.com',
+    email: 'jahan@jkhospital.com',
     specialty: 'Pediatric Specialist',
     specialization: 'Pediatrics',
     qualification: 'MBBS, MD Pediatrics',
@@ -40,7 +40,7 @@ export const doctors = [
   {
     _id: 'doc-suguna',
     name: 'Dr. Suguna',
-    email: 'arjun@jkhospital.com',
+    email: 'sugu@jkhospital.com',
     specialty: 'General Physician',
     specialization: 'General Medicine',
     qualification: 'MBBS, DNB Family Medicine',
