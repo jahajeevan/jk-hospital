@@ -9,6 +9,7 @@ import doctorRoutes from './routes/doctorRoutes.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import refundRoutes from './routes/refundRoutes.js';
+import seedRoutes from './routes/seedRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import localMailRoutes from './routes/localMailRoutes.js';
@@ -55,6 +56,7 @@ const mountApiRoutes = (prefix) => {
   app.use(`${prefix}/docs`, swaggerUi.serveFiles(openApiDocument), swaggerUi.setup(openApiDocument));
   app.use(`${prefix}/auth`, authLimiter, authRoutes);
   app.use(`${prefix}/doctors`, doctorRoutes);
+  app.use(`${prefix}/seed`, seedRoutes);
   app.use(`${prefix}/appointments`, appointmentRoutes);
   app.use(`${prefix}/admin`, adminRoutes);
   app.use(`${prefix}/refunds`, refundRoutes);
