@@ -84,11 +84,18 @@ export const fetchDoctorSlots = async (doctorId, date) => {
 
 export const createDoctor = async (doctorData) => {
   try {
-    // Use admin endpoint to save doctors to Supabase
+    console.log('Creating doctor with API data:', { ...doctorData, password: '[redacted]' });
     const response = await apiClient.post('/admin/doctors', doctorData);
+    console.log('Doctor created successfully:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error creating doctor:', error);
+    console.error('API Error creating doctor:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      message: error.response?.data?.message || error.message,
+      data: error.response?.data,
+      headers: error.response?.headers
+    });
     throw error;
   }
 };

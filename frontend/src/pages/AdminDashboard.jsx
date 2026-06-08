@@ -90,7 +90,12 @@ const buildOverviewFromBookings = (items, refunds = []) => {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/admin/login" replace />;
+  
+  // Allow access if:
+  // 1. Clerk user is logged in as admin, OR
+  // 2. JWT token (email/password login) is in sessionStorage
+  const hasToken = sessionStorage.getItem('jk_doctor_token');
+  if (!user && !hasToken) return <Navigate to="/admin/login" replace />;
   
   const [unlocked, setUnlocked] = useState(() => isAdminSessionOpen());
   const [password, setPassword] = useState('');
@@ -359,6 +364,15 @@ export default function AdminDashboard() {
     if (error) return toast.error(error);
     
     try {
+      // Check if user has JWT token (email/password login)
+      const token = sessionStorage.getItem('jk_doctor_token');
+      if (!token) {
+        toast.error('Authentication required. Please login with email/password from staff login.');
+        return;
+      }
+      
+      console.log('Creating doctor with token:', token?.substring(0, 20) + '...');
+      
       const doctor = await createDoctorApi({
         name: doctorForm.name.trim(),
         specialty: doctorForm.specialty.trim(),
@@ -375,16 +389,20 @@ export default function AdminDashboard() {
         slots: []
       });
       
+      console.log('Doctor created:', doctor);
+      
       // Refresh doctors list
       const freshDoctors = await fetchDoctors();
       setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
       
       setDoctorFormOpen(false);
       setDoctorForm(defaultDoctorForm);
-      toast.success(`Dr. ${doctor.name} added successfully. Login credentials: ${doctor.email} / [password]`);
+      toast.success(`Dr. ${doctor.name} added successfully!\nEmail: ${doctor.email}\nPassword: [as set]`);
     } catch (error) {
-      console.error('Error creating doctor:', error);
-      toast.error(error.response?.data?.message || 'Failed to add doctor');
+      console.error('Full error creating doctor:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to add doctor';
+      console.error('Error message:', errorMsg);
+      toast.error(errorMsg);
     }
   };
 
