@@ -103,38 +103,41 @@ export default function AuthPage({ mode }) {
   const submitLocalLogin = async (event) => {
     event.preventDefault();
     try {
-      // 1. Try backend authentication first
-      try {
-        const response = await api.post('/auth/login', {
-          email: localLogin.email,
-          password: localLogin.password
-        });
-        if (response.data?.token) {
-          // Token is handled by API interceptor using Clerk
-          // Set local userStore session so user is recognized in the context
-          const account = {
-            email: response.data.user?.email,
-            name: response.data.user?.name,
-            role: response.data.user?.role
-          };
-          await createUserSession(account);
-          window.dispatchEvent(new Event('jk-auth-sync'));
-          toast.success('Login successful');
-          navigate(dashboardForRole(response.data.user.role), { replace: true });
-          return;
-        }
-      } catch (backendErr) {
-        console.warn('Backend authentication failed, trying local fallback:', backendErr);
+      const response = await api.post('/auth/login', {
+        email: localLogin.email,
+        password: localLogin.password
+      });
+      if (response.data?.token && response.data?.user) {
+        // Store JWT token for use in subsequent API calls
+        // The API client will use this token in requests (jk_doctor_token in sessionStorage)
+        sessionStorage.setItem('jk_doctor_token', response.data.token);
+        
+        // Create user session with role info
+        const account = {
+          email: response.data.user?.email,
+          name: response.data.user?.name,
+          role: response.data.user?.role
+        };
+        await createUserSession(account);
+        window.dispatchEvent(new Event('jk-auth-sync'));
+        
+        // Log in all roles: admin, doctor, receptionist, pharmacist, staff, patient
+        const roleDisplay = {
+          'admin': 'Admin',
+          'doctor': 'Doctor',
+          'receptionist': 'Receptionist',
+          'pharmacist': 'Pharmacist',
+          'staff': 'Staff',
+          'patient': 'Patient'
+        };
+        toast.success(`${roleDisplay[response.data.user?.role] || 'Login'} login successful`);
+        navigate(dashboardForRole(response.data.user.role), { replace: true });
+      } else {
+        toast.error('Invalid login response from server');
       }
-
-      // 2. Fallback to client-side local authentication
-      const account = await authenticateUser(localLogin.email, localLogin.password);
-      const session = await createUserSession(account);
-      window.dispatchEvent(new Event('jk-auth-sync'));
-      toast.success('Login successful (offline mode)');
-      navigate(dashboardForRole(session.user.role), { replace: true });
     } catch (error) {
-      toast.error(error.message || 'Invalid email or password');
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.message || error.message || 'Invalid email or password');
     }
   };
 

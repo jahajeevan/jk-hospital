@@ -6,6 +6,7 @@ import { env, validateEnv } from './config/env.js';
 import { initRealtime } from './modules/realtime/socket.js';
 import { logger } from './utils/logger.js';
 import { seedDoctors } from './services/seedService.js';
+import { seedStaff } from './services/seedStaffService.js';
 
 validateEnv();
 
@@ -23,6 +24,9 @@ const shutdown = async (server, signal) => {
 };
 
 await connectDB();
+
+// Seed staff users (admin, receptionist, pharmacist) on startup
+await seedStaff();
 
 // Seed doctors into Supabase on startup
 await seedDoctors();

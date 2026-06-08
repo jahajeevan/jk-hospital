@@ -10,7 +10,6 @@ const BookingPage = lazy(() => import('./pages/BookingPage.jsx'));
 const CompleteProfilePage = lazy(() => import('./pages/CompleteProfilePage.jsx'));
 const Contact = lazy(() => import('./pages/Contact.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
-const DoctorLoginPage = lazy(() => import('./pages/DoctorLoginPage.jsx'));
 const Doctors = lazy(() => import('./pages/Doctors.jsx'));
 const PaymentPage = lazy(() => import('./pages/PaymentPage.jsx'));
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage.jsx'));
@@ -38,7 +37,6 @@ export default function App() {
         <Route path="/login" element={<Suspense fallback={<ScreenLoader />}><AuthPage mode="login" /></Suspense>} />
         <Route path="/signup" element={<Suspense fallback={<ScreenLoader />}><AuthPage mode="signup" /></Suspense>} />
         <Route path="/admin/login" element={<Suspense fallback={<ScreenLoader />}><AuthPage mode="admin" /></Suspense>} />
-        <Route path="/doctor/login" element={<Suspense fallback={<ScreenLoader />}><DoctorLoginPage /></Suspense>} />
         <Route path="/services" element={<Suspense fallback={<ScreenLoader />}><Services /></Suspense>} />
         <Route path="/ai" element={<Suspense fallback={<ScreenLoader />}><SmartAiPage /></Suspense>} />
         <Route path="/doctors" element={<Suspense fallback={<ScreenLoader />}><Doctors /></Suspense>} />
