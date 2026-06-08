@@ -135,7 +135,7 @@ export default function AdminDashboard() {
         setOverview(stats);
       } catch (error) {
         console.error('Error loading admin data:', error);
-        toast.error('Could not load live admin data');
+        toast.error('Could not load all data');
         setBookings([]);
         setDoctorList([]);
         setRefunds([]);
