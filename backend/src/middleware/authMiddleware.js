@@ -153,3 +153,13 @@ export const requirePermission = (...permissions) => (req, _res, next) => {
   }
   next();
 };
+
+// Convenience middleware for common use cases
+export const requireUser = protect;
+
+export const requireAdmin = (req, res, next) => {
+  protect(req, res, (err) => {
+    if (err) return next(err);
+    authorize('admin')(req, res, next);
+  });
+};
