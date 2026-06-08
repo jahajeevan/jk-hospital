@@ -90,6 +90,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [doctorFormOpen, setDoctorFormOpen] = useState(false);
   const [slotFormOpen, setSlotFormOpen] = useState(false);
+  const [doctorForm, setDoctorForm] = useState(defaultDoctorForm);
+  const [slotForm, setSlotForm] = useState(defaultSlotForm);
 
   useEffect(() => {
     let cancelled = false;
