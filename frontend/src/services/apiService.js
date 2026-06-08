@@ -6,7 +6,30 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// Determine API URL based on environment
+const getApiUrl = () => {
+  // If explicitly set via env variable, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // If running on localhost, use local backend
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:8000/api';
+  }
+  
+  // For production domains, use Render backend
+  if (window.location.hostname === 'www.jahajeevan.me' || 
+      window.location.hostname === 'jahajeevan.me' ||
+      window.location.hostname.includes('vercel.app')) {
+    return 'https://jk-hospital-render.onrender.com/api';
+  }
+  
+  // Default fallback
+  return 'http://localhost:8000/api';
+};
+
+const API_BASE_URL = getApiUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
