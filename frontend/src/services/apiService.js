@@ -57,6 +57,36 @@ export const fetchDoctorSlots = async (doctorId, date) => {
   }
 };
 
+export const createDoctor = async (doctorData) => {
+  try {
+    const response = await apiClient.post('/doctors', doctorData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating doctor:', error);
+    throw error;
+  }
+};
+
+export const updateDoctor = async (id, updates) => {
+  try {
+    const response = await apiClient.patch(`/doctors/${id}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating doctor ${id}:`, error);
+    throw error;
+  }
+};
+
+export const updateDoctorSlot = async (doctorId, slotId, updates) => {
+  try {
+    const response = await apiClient.patch(`/doctors/${doctorId}/slots/${slotId}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating slot ${slotId} for doctor ${doctorId}:`, error);
+    throw error;
+  }
+};
+
 // ============ APPOINTMENTS (Bookings) ============
 export const fetchAppointments = async (filters = {}) => {
   try {
@@ -114,6 +144,26 @@ export const deleteAppointment = async (id) => {
     return response.data;
   } catch (error) {
     console.error(`Error deleting appointment ${id}:`, error);
+    throw error;
+  }
+};
+
+export const fetchRefundRequests = async (filters = {}) => {
+  try {
+    const response = await apiClient.get('/refunds', { params: filters });
+    return response.data || [];
+  } catch (error) {
+    console.error('Error fetching refund requests:', error);
+    throw error;
+  }
+};
+
+export const updateRefundRequest = async (id, updates) => {
+  try {
+    const response = await apiClient.patch(`/refunds/${id}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating refund request ${id}:`, error);
     throw error;
   }
 };
@@ -237,6 +287,16 @@ export const updateInventoryItem = async (id, updates) => {
     return response.data;
   } catch (error) {
     console.error(`Error updating inventory item ${id}:`, error);
+    throw error;
+  }
+};
+
+export const deleteInventoryItem = async (id) => {
+  try {
+    const response = await apiClient.delete(`/pharmacy-inventory/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error deleting inventory item ${id}:`, error);
     throw error;
   }
 };

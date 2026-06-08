@@ -7,12 +7,8 @@ import api from '../api/client.js';
 import MetricCard from '../components/MetricCard.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
-import {
-  DEPARTMENTS,
-  getLocalDoctors,
-  getLocalRefunds
-} from '../utils/localStore.js';
-import { fetchAppointments, fetchDoctors } from '../services/apiService.js';
+import { DEPARTMENTS } from '../utils/localStore.js';
+import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor, updateDoctorSlot, createDoctor as createDoctorApi, updateAppointment } from '../services/apiService.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { MIN_CONSULTATION_FEE, normalizeFee } from '../utils/paymentRules.js';
 import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl } from '../utils/validation.js';
@@ -96,26 +92,27 @@ export default function AdminDashboard() {
     const loadServer = async () => {
       try {
         setLoading(true);
-        const [appointmentsData, doctorsData] = await Promise.all([
+        const [appointmentsData, doctorsData, refundsData] = await Promise.all([
           fetchAppointments(),
-          fetchDoctors()
+          fetchDoctors(),
+          fetchRefundRequests()
         ]);
         if (cancelled) return;
         setBookings(Array.isArray(appointmentsData) ? appointmentsData : []);
         setDoctorList(Array.isArray(doctorsData) ? doctorsData : []);
-        setRefunds(getLocalRefunds());
+        setRefunds(Array.isArray(refundsData) ? refundsData : []);
         
         const stats = buildOverviewFromBookings(
           Array.isArray(appointmentsData) ? appointmentsData : [],
-          getLocalRefunds()
+          Array.isArray(refundsData) ? refundsData : []
         );
         setOverview(stats);
       } catch (error) {
         console.error('Error loading admin data:', error);
         toast.error('Could not load live admin data');
         setBookings([]);
-        setDoctorList(getLocalDoctors());
-        setRefunds(getLocalRefunds());
+        setDoctorList([]);
+        setRefunds([]);
       } finally {
         setLoading(false);
       }
@@ -178,13 +175,13 @@ export default function AdminDashboard() {
 
   const markLeave = async (doctor) => {
     const nextDoctor = { ...doctor, isAvailable: false };
-    saveLocalDoctor(nextDoctor);
-    setDoctorList(getLocalDoctors());
     try {
-      await api.patch(`/admin/doctors/${doctor._id}/leave`, { date: new Date().toISOString() });
+      const updated = await updateDoctor(doctor._id, nextDoctor);
+      setDoctorList(prev => prev.map(d => d._id === doctor._id ? updated : d));
       toast.success('Doctor leave mode enabled and patients notified');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Demo leave mode enabled');
+      console.error('Error marking leave:', error);
+      toast.error(error.response?.data?.message || 'Could not mark doctor leave');
     }
   };
 
@@ -206,12 +203,14 @@ export default function AdminDashboard() {
   };
 
   const persistDoctor = async (doctor) => {
-    saveLocalDoctor(doctor);
-    setDoctorList(getLocalDoctors());
     try {
-      await api.put(`/admin/doctors/${doctor._id}`, doctor);
-    } catch {
-      // Local admin mode still works when the backend is unavailable or the admin is not signed in with an API token.
+      const updated = await updateDoctor(doctor._id, doctor);
+      setDoctorList(prev => prev.map(d => d._id === doctor._id ? updated : d));
+      toast.success('Doctor updated');
+    } catch (error) {
+      console.error('Error updating doctor:', error);
+      toast.error('Failed to update doctor');
+      throw error;
     }
   };
 
@@ -244,12 +243,23 @@ export default function AdminDashboard() {
     if (field === 'walkInTokenLimit') {
       nextSlot.walkInBookedTokens = Math.min(nextSlot.walkInBookedTokens || 0, nextSlot.walkInTokenLimit);
     }
-    const nextDoctor = saveLocalSlot(doctorId, nextSlot);
-    setDoctorList(getLocalDoctors());
+    
+    // Update in UI immediately for responsiveness
+    const nextDoctor = {
+      ...doctor,
+      slots: doctor.slots.map(s => s._id === slotId ? nextSlot : s)
+    };
+    setDoctorList(prev => prev.map(d => d._id === doctorId ? nextDoctor : d));
+    
+    // Update on server
     try {
-      await api.put(`/admin/doctors/${doctorId}`, nextDoctor);
-    } catch {
-      // Local admin mode still works when the backend is unavailable or the admin is not signed in with an API token.
+      await updateDoctorSlot(doctorId, slotId, nextSlot);
+    } catch (error) {
+      console.error('Error updating slot:', error);
+      toast.error('Failed to update slot');
+      // Reload to sync with server
+      const freshDoctors = await fetchDoctors();
+      setDoctorList(freshDoctors);
     }
   };
 
@@ -281,27 +291,33 @@ export default function AdminDashboard() {
     event.preventDefault();
     const error = validateDoctorForm();
     if (error) return toast.error(error);
-    const doctor = createLocalDoctor({
-      ...doctorForm,
-      name: doctorForm.name.trim(),
-      specialty: doctorForm.specialty.trim(),
-      specialization: (doctorForm.specialization || doctorForm.specialty).trim(),
-      qualification: doctorForm.qualification.trim(),
-      department: doctorForm.department,
-      experience: doctorForm.experience.trim(),
-      avatar: doctorForm.avatar.trim(),
-      bio: doctorForm.bio.trim(),
-      fee: normalizeFee(doctorForm.fee)
-    });
-    setDoctorList(getLocalDoctors());
-    setDoctorFormOpen(false);
-    setDoctorForm(defaultDoctorForm);
+    
     try {
-      await api.put(`/admin/doctors/${doctor._id}`, doctor);
-    } catch {
-      // Local admin mode still works when the backend is unavailable.
+      const doctor = await createDoctorApi({
+        ...doctorForm,
+        name: doctorForm.name.trim(),
+        specialty: doctorForm.specialty.trim(),
+        specialization: (doctorForm.specialization || doctorForm.specialty).trim(),
+        qualification: doctorForm.qualification.trim(),
+        department: doctorForm.department,
+        experience: doctorForm.experience.trim(),
+        avatar: doctorForm.avatar.trim(),
+        bio: doctorForm.bio.trim(),
+        fee: normalizeFee(doctorForm.fee),
+        slots: []
+      });
+      
+      // Refresh doctors list
+      const freshDoctors = await fetchDoctors();
+      setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+      
+      setDoctorFormOpen(false);
+      setDoctorForm(defaultDoctorForm);
+      toast.success(`${doctor.name} added`);
+    } catch (error) {
+      console.error('Error creating doctor:', error);
+      toast.error('Failed to add doctor');
     }
-    toast.success(`${doctor.name} added`);
   };
 
   const openSlotForm = (doctorId, date = '') => {
@@ -334,39 +350,70 @@ export default function AdminDashboard() {
     event.preventDefault();
     const error = validateSlotForm();
     if (error) return toast.error(error);
-    const nextDoctor = createLocalSlot(slotForm.doctorId, {
-      label: slotForm.label.trim(),
-      date: slotForm.date,
-      availableFrom: slotForm.availableFrom,
-      availableUntil: slotForm.availableUntil,
-      startTime: slotForm.startTime,
-      endTime: slotForm.endTime,
-      tokenLimit: Number(slotForm.tokenLimit),
-      walkInTokenLimit: Number(slotForm.walkInTokenLimit),
-      fee: normalizeFee(slotForm.fee),
-      advanceBookingMinutes: Number(slotForm.advanceBookingMinutes),
-      isActive: slotForm.isActive
-    });
-    setDoctorList(getLocalDoctors());
-    setSlotFormOpen(false);
-    setSlotForm(defaultSlotForm);
+    
     try {
-      await api.put(`/admin/doctors/${nextDoctor._id}`, nextDoctor);
-    } catch {
-      // Local admin mode still works when the backend is unavailable.
+      const doctorId = slotForm.doctorId;
+      const doctor = doctorList.find(d => d._id === doctorId);
+      if (!doctor) {
+        toast.error('Doctor not found');
+        return;
+      }
+      
+      // Create new slot object
+      const newSlot = {
+        _id: `slot_${Date.now()}`, // Generate temporary ID
+        label: slotForm.label.trim(),
+        date: slotForm.date,
+        availableFrom: slotForm.availableFrom,
+        availableUntil: slotForm.availableUntil,
+        startTime: slotForm.startTime,
+        endTime: slotForm.endTime,
+        tokenLimit: Number(slotForm.tokenLimit),
+        walkInTokenLimit: Number(slotForm.walkInTokenLimit),
+        bookedTokens: 0,
+        walkInBookedTokens: 0,
+        fee: normalizeFee(slotForm.fee),
+        advanceBookingMinutes: Number(slotForm.advanceBookingMinutes),
+        isActive: slotForm.isActive
+      };
+      
+      // Update doctor with new slot
+      const updatedDoctor = {
+        ...doctor,
+        slots: [...(doctor.slots || []), newSlot]
+      };
+      
+      // Update on server
+      await updateDoctor(doctorId, updatedDoctor);
+      
+      // Refresh doctors list
+      const freshDoctors = await fetchDoctors();
+      setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+      
+      setSlotFormOpen(false);
+      setSlotForm(defaultSlotForm);
+      toast.success('Slot added');
+    } catch (error) {
+      console.error('Error creating slot:', error);
+      toast.error('Failed to add slot');
     }
-    toast.success('Slot added');
   };
 
-  const deleteDoctor = (doctor) => {
+  const deleteDoctor = async (doctor) => {
     const hasBookings = bookings.some((booking) => booking.doctor?._id === doctor._id);
     if (hasBookings) {
       toast.error('This doctor has bookings. Mark unavailable instead of deleting.');
       return;
     }
-    removeLocalDoctor(doctor._id);
-    setDoctorList(getLocalDoctors());
-    toast.success(`${doctor.name} removed`);
+    try {
+      // Mark doctor as unavailable instead of deleting
+      const updated = await updateDoctor(doctor._id, { isAvailable: false });
+      setDoctorList(prev => prev.map(d => d._id === doctor._id ? updated : d));
+      toast.success(`${doctor.name} removed`);
+    } catch (error) {
+      console.error('Error deleting doctor:', error);
+      toast.error('Failed to remove doctor');
+    }
   };
 
   const decide = async (booking, status) => {
@@ -377,22 +424,34 @@ export default function AdminDashboard() {
     const adminNote = status === 'approved'
       ? 'Payment proof verified. Token accepted by JK Hospital staff.'
       : 'Your appointment token is cancelled due to verification reasons. Please contact JK Hospital reception at 7845265507.';
-    const updated = updateLocalBookingStatus(booking._id, status, adminNote);
-    setBookings(getLocalBookings());
+    
     try {
-      await api.post('/appointments/sync', updated);
-    } catch (syncErr) {
-      console.warn('Failed to sync appointment status to server:', syncErr);
+      // Update appointment status via API
+      const updated = await updateAppointment(booking._id, { 
+        status, 
+        adminNote,
+        verificationStatus: status === 'approved' ? 'verified' : 'rejected'
+      });
+      
+      // Refresh bookings list
+      const freshBookings = await fetchAppointments();
+      setBookings(Array.isArray(freshBookings) ? freshBookings : []);
+      
+      // Send email notification
+      await api.post('/local-mail/appointment-status', {
+        email: booking.patientEmail,
+        patientName: booking.patientName,
+        doctorName: booking.doctor?.name,
+        tokenNumber: booking.tokenNumber,
+        status,
+        adminNote
+      }).then(() => toast.success(`Token ${status} and email sent`)).catch(() => toast.success(`Token ${status} locally`));
+      
+      return updated;
+    } catch (error) {
+      console.error('Error updating booking status:', error);
+      toast.error('Failed to update appointment status');
     }
-    await api.post('/local-mail/appointment-status', {
-      email: booking.patientEmail,
-      patientName: booking.patientName,
-      doctorName: booking.doctor?.name,
-      tokenNumber: booking.tokenNumber,
-      status,
-      adminNote
-    }).then(() => toast.success(`Token ${status} and email sent`)).catch(() => toast.success(`Token ${status} locally`));
-    return updated;
   };
 
   if (!unlocked) {
@@ -800,8 +859,28 @@ export default function AdminDashboard() {
                   </div>
                   {refund.status === 'pending' && (
                     <div className="mt-3 flex gap-2">
-                      <button type="button" onClick={() => { updateLocalRefundStatus(refund._id, 'approved', 'Approved by admin'); setRefunds(getLocalRefunds()); toast.success('Approved'); }} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Approve</button>
-                      <button type="button" onClick={() => { updateLocalRefundStatus(refund._id, 'declined', 'Declined by admin'); setRefunds(getLocalRefunds()); toast.success('Declined'); }} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">Decline</button>
+                      <button type="button" onClick={async () => { 
+                        try {
+                          await updateRefundRequest(refund._id, { status: 'approved', adminNote: 'Approved by admin' });
+                          const freshRefunds = await fetchRefundRequests();
+                          setRefunds(Array.isArray(freshRefunds) ? freshRefunds : []);
+                          toast.success('Approved');
+                        } catch (error) {
+                          console.error('Error approving refund:', error);
+                          toast.error('Failed to approve refund');
+                        }
+                      }} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Approve</button>
+                      <button type="button" onClick={async () => {
+                        try {
+                          await updateRefundRequest(refund._id, { status: 'declined', adminNote: 'Declined by admin' });
+                          const freshRefunds = await fetchRefundRequests();
+                          setRefunds(Array.isArray(freshRefunds) ? freshRefunds : []);
+                          toast.success('Declined');
+                        } catch (error) {
+                          console.error('Error declining refund:', error);
+                          toast.error('Failed to decline refund');
+                        }
+                      }} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">Decline</button>
                     </div>
                   )}
                 </article>

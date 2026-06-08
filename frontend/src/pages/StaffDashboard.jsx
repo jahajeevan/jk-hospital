@@ -7,19 +7,14 @@ import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api/client.js';
 import {
   DEPARTMENTS,
-  getLocalAuditLogs,
-  getLocalDoctors,
-  getLocalInventory,
-  getLocalNotifications,
   getWalkInSlotOptions,
   markPatientArrived,
-  removeLocalMedicine,
-  saveLocalMedicine,
   savePharmacyBillForBooking,
   savePrescriptionForBooking,
-  updateAppointmentWorkflow
+  updateAppointmentWorkflow,
+  createWalkInBooking
 } from '../utils/localStore.js';
-import { fetchUserAppointments, fetchAppointments, fetchDoctors } from '../services/apiService.js';
+import { fetchUserAppointments, fetchAppointments, fetchDoctors, fetchAuditLogs, fetchPharmacyInventory, fetchNotifications, fetchInventoryItem, updateInventoryItem, createInventoryItem, deleteInventoryItem } from '../services/apiService.js';
 
 const tabs = [
   ['reception', 'Reception'],
@@ -75,6 +70,8 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const [bookings, setBookings] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [inventory, setInventory] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [staffSection, setStaffSection] = useState('dashboard');
@@ -96,15 +93,26 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
       } else {
         bookingsData = await fetchAppointments();
       }
-      const doctorsData = await fetchDoctors();
+      const [doctorsData, inventoryData, notificationsData, auditLogsData] = await Promise.all([
+        fetchDoctors(),
+        fetchPharmacyInventory(),
+        fetchNotifications(),
+        fetchAuditLogs()
+      ]);
+      
       setBookings(Array.isArray(bookingsData) ? bookingsData : []);
       setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
-      setInventory(getLocalInventory());
+      setInventory(Array.isArray(inventoryData) ? inventoryData : []);
+      setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+      setAuditLogs(Array.isArray(auditLogsData) ? auditLogsData : []);
     } catch (error) {
       console.error('Error loading staff data:', error);
+      toast.error('Could not load staff data');
       setBookings([]);
-      setDoctors(getLocalDoctors());
-      setInventory(getLocalInventory());
+      setDoctors([]);
+      setInventory([]);
+      setNotifications([]);
+      setAuditLogs([]);
     } finally {
       setLoading(false);
     }
@@ -151,7 +159,6 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const pharmacyQueue = bookings.filter((item) => ['prescription_generated', 'pharmacy_pending'].includes(item.status));
   const completedToday = bookings.filter((item) => item.status === 'completed');
   const alerts = getInventoryAlerts();
-  const notifications = getLocalNotifications({ role: tab === 'pharmacy' ? 'pharmacist' : tab });
   const selectedWalkInDoctor = doctors.find((doctor) => doctor._id === walkIn.doctorId) || null;
   const walkInSlotOptions = selectedWalkInDoctor ? getWalkInSlotOptions(selectedWalkInDoctor, walkIn.date) : [];
   const selectedBillBooking = bookings.find((booking) => booking._id === billBookingId);
@@ -226,12 +233,32 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
     toast.success('Bill paid, inventory updated, visit summary saved');
   };
 
-  const submitMedicine = () => {
+  const submitMedicine = async () => {
     if (!medicineForm.name.trim()) return toast.error('Enter medicine name');
-    saveLocalMedicine(medicineForm);
-    setMedicineForm(emptyMedicine);
-    reload();
-    toast.success('Inventory updated');
+    try {
+      const newMedicine = {
+        name: medicineForm.name.trim(),
+        batchNumber: medicineForm.batchNumber.trim(),
+        expiryDate: medicineForm.expiryDate,
+        purchasePrice: Number(medicineForm.purchasePrice) || 0,
+        sellingPrice: Number(medicineForm.sellingPrice) || 0,
+        currentStock: Number(medicineForm.currentStock) || 0,
+        minimumStockLevel: Number(medicineForm.minimumStockLevel) || 0
+      };
+      
+      // Create inventory item via API
+      await createInventoryItem(newMedicine);
+      
+      // Refresh inventory
+      const freshInventory = await fetchPharmacyInventory();
+      setInventory(Array.isArray(freshInventory) ? freshInventory : []);
+      
+      setMedicineForm(emptyMedicine);
+      toast.success('Inventory updated');
+    } catch (error) {
+      console.error('Error adding medicine:', error);
+      toast.error('Failed to add medicine');
+    }
   };
 
   return (
@@ -504,7 +531,17 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
                     <tr key={medicine._id} className="border-t border-slate-200">
                       <td className="py-3 font-bold">{medicine.name}</td><td>{medicine.batchNumber}</td><td>{medicine.expiryDate}</td><td>INR {medicine.purchasePrice}</td><td>INR {medicine.sellingPrice}</td><td>{medicine.currentStock}</td>
                       <td>{medicine.currentStock <= medicine.minimumStockLevel ? <span className="text-xs font-bold text-rose-700">LOW STOCK</span> : 'OK'}</td>
-                      <td><button type="button" className="text-xs font-bold text-rose-700" onClick={() => { removeLocalMedicine(medicine._id); reload(); }}>Delete</button></td>
+                      <td><button type="button" className="text-xs font-bold text-rose-700" onClick={async () => { 
+                        try {
+                          await deleteInventoryItem(medicine._id);
+                          const freshInventory = await fetchPharmacyInventory();
+                          setInventory(Array.isArray(freshInventory) ? freshInventory : []);
+                          toast.success('Medicine deleted');
+                        } catch (error) {
+                          console.error('Error deleting medicine:', error);
+                          toast.error('Failed to delete medicine');
+                        }
+                      }}>Delete</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -517,14 +554,14 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
           <section className="patient-panel mt-8 rounded-xl p-5">
             <h2 className="flex items-center gap-2 text-xl font-bold"><Activity size={19} /> Audit trail</h2>
             <div className="mt-4 grid gap-3">
-              {getLocalAuditLogs().map((entry) => (
+              {auditLogs.map((entry) => (
                 <article key={entry._id} className="rounded-xl bg-white p-4 text-sm ring-1 ring-slate-100">
                   <p className="font-bold">{entry.action}</p>
                   <p className="text-slate-500">{entry.role} · {entry.actor} · {new Date(entry.timestamp).toLocaleString()}</p>
                   {entry.details ? <p className="mt-1 text-slate-600">{entry.details}</p> : null}
                 </article>
               ))}
-              {!getLocalAuditLogs().length && <p className="text-sm text-slate-500">No audit events yet.</p>}
+              {!auditLogs.length && <p className="text-sm text-slate-500">No audit events yet.</p>}
             </div>
           </section>
         )}

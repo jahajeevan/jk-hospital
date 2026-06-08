@@ -1,7 +1,25 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
-import { clearUserSession, readUserSession } from '../utils/userStore.js';
+
+// Simple session management functions
+const readUserSession = () => {
+  try {
+    const session = localStorage.getItem('jk_user_session');
+    return session ? JSON.parse(session) : null;
+  } catch (error) {
+    console.error('Error reading user session:', error);
+    return null;
+  }
+};
+
+const clearUserSession = () => {
+  try {
+    localStorage.removeItem('jk_user_session');
+  } catch (error) {
+    console.error('Error clearing user session:', error);
+  }
+};
 
 const AuthContext = createContext(null);
 const BROWSER_SESSION_KEY = 'jk_browser_session_alive';

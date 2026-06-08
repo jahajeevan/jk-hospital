@@ -1,51 +1,53 @@
-import { createSessionToken, hashPassword, verifyPassword } from './secureCrypto.js';
-import { secureGet, secureSet } from './secureStore.js';
+/**
+ * Simple admin authentication utilities
+ * Uses localStorage to store admin session state
+ */
 
-const ADMIN_KEY = 'jk_admin_credentials';
-const ADMIN_SESSION_KEY = 'jk_admin_session';
-const SESSION_MS = 2 * 60 * 60 * 1000;
+const ADMIN_SESSION_KEY = 'jk_admin_session_open';
+const ADMIN_PASSWORD_KEY = 'jk_admin_password_hash';
 
-export const hasAdminCredential = async () => Boolean(await secureGet(ADMIN_KEY));
+// Simple hash function (not cryptographically secure, for demo purposes only)
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16);
+}
 
-export const setupAdminCredential = async (password) => {
+export function isAdminSessionOpen() {
+  return localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+}
+
+export function openAdminSession() {
+  localStorage.setItem(ADMIN_SESSION_KEY, 'true');
+  // Set session timeout - clear after 1 hour
+  setTimeout(() => {
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+  }, 3600000);
+}
+
+export function closeAdminSession() {
+  localStorage.removeItem(ADMIN_SESSION_KEY);
+}
+
+export async function verifyAdminCredential(password) {
+  // Minimum password length check
   if (!password || password.length < 10) {
-    throw new Error('Admin password must be at least 10 characters');
-  }
-  await secureSet(ADMIN_KEY, await hashPassword(password));
-};
-
-export const verifyAdminCredential = async (password) => {
-  const record = await secureGet(ADMIN_KEY);
-  if (!record) {
-    await setupAdminCredential(password);
-    return true;
-  }
-  return verifyPassword(password, record);
-};
-
-export const openAdminSession = () => {
-  const session = {
-    token: createSessionToken(),
-    expiresAt: Date.now() + SESSION_MS
-  };
-  sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
-  return session;
-};
-
-export const isAdminSessionOpen = () => {
-  const raw = sessionStorage.getItem(ADMIN_SESSION_KEY);
-  if (!raw) return false;
-  try {
-    const session = JSON.parse(raw);
-    if (!session?.token || session.expiresAt < Date.now()) {
-      sessionStorage.removeItem(ADMIN_SESSION_KEY);
-      return false;
-    }
-    return true;
-  } catch {
-    sessionStorage.removeItem(ADMIN_SESSION_KEY);
     return false;
   }
-};
 
-export const closeAdminSession = () => sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  const storedHash = localStorage.getItem(ADMIN_PASSWORD_KEY);
+  const providedHash = simpleHash(password);
+
+  // If no stored hash, set this as the first password
+  if (!storedHash) {
+    localStorage.setItem(ADMIN_PASSWORD_KEY, providedHash);
+    return true;
+  }
+
+  // Verify password matches stored hash
+  return storedHash === providedHash;
+}
