@@ -99,6 +99,10 @@ export const getInventoryAlerts = () => {
 };
 
 // Placeholder for additional utilities
-export const getSlotAvailability = (doctor, date) => {
-  return getWalkInSlotOptions(doctor, date);
-};
+export const getSlotAvailability = () => ({
+  isBookable: true,
+  isFull: false,
+  remaining: 999,
+  estimatedWaitMinutes: 0,
+  reasons: []
+});
