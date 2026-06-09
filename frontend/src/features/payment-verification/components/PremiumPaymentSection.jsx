@@ -258,8 +258,6 @@ export default function PremiumPaymentSection({ booking, user }) {
         open={showModal}
         status={status}
         message={errorMessage}
-        volume={audio.volume}
-        onVolumeChange={audio.setVolume}
         voiceEnabled={false}
       />
 
