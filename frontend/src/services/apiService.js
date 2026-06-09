@@ -106,7 +106,7 @@ export const createDoctor = async (doctorData) => {
 
 export const updateDoctor = async (id, updates) => {
   try {
-    const response = await api.patch(`/doctors/${id}`, updates);
+    const response = await api.patch(`/admin/doctors/${id}`, updates);
     return response.data;
   } catch (error) {
     console.error(`Error updating doctor ${id}:`, error);
