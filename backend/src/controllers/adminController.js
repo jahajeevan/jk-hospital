@@ -137,9 +137,13 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
     await supabase.from('doctor_slots').delete().eq('doctor_id', doctor.id);
     const slotsToInsert = slots.map((s) => {
       const mapped = toSnakeObj(s);
+
       mapped.doctor_id = doctor.id;
+
       delete mapped.id;
       delete mapped._id;
+      delete mapped.date; // <-- ADD THIS
+
       return mapped;
     });
     const { error: slotsErr } = await supabase
