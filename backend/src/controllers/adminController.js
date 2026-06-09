@@ -142,8 +142,15 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
       delete mapped._id;
       return mapped;
     });
-    const { error: slotsErr } = await supabase.from('doctor_slots').insert(slotsToInsert);
-    if (slotsErr) throw slotsErr;
+    const { error: slotsErr } = await supabase
+      .from('doctor_slots')
+      .insert(slotsToInsert);
+
+    if (slotsErr) {
+      console.error('DOCTOR SLOT ERROR:', slotsErr);
+      console.error('SLOTS BEING INSERTED:', slotsToInsert);
+      throw slotsErr;
+    }
   }
 
   // Fetch full populated doctor with slots
@@ -159,10 +166,10 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
 export const deleteDoctor = asyncHandler(async (req, res) => {
   // Delete doctor's user account too
   await supabase.from('users').delete().eq('linkedDoctorId', req.params.id);
-  
+
   // Delete doctor slots
   await supabase.from('doctor_slots').delete().eq('doctor_id', req.params.id);
-  
+
   // Delete doctor
   const { error } = await supabase.from('doctors').delete().eq('id', req.params.id);
   if (error) throw error;
