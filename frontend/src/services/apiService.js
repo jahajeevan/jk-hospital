@@ -106,8 +106,8 @@ export const createDoctor = async (doctorData) => {
 
 export const updateDoctor = async (id, updates) => {
   try {
-    const response = await api.patch(`/admin/doctors/${id}`, updates);
-    return response.data;
+    const response = await api.put(`/admin/doctors/${id}`, updates);
+    return response.data?.doctor || response.data;
   } catch (error) {
     console.error(`Error updating doctor ${id}:`, error);
     throw error;
@@ -145,10 +145,10 @@ export const deleteSlot = async (slotId) => {
 };
 
 // ============ APPOINTMENTS (Bookings) ============
-export const fetchAppointments = async (filters = {}) => {
+export const fetchAppointments = async () => {
   try {
-    const response = await api.get('/appointments', { params: filters });
-    return response.data || [];
+    const response = await api.get('/admin/bookings');
+    return response.data?.appointments || [];
   } catch (error) {
     console.error('Error fetching appointments:', error);
     throw error;
