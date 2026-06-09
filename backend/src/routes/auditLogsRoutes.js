@@ -10,9 +10,6 @@ router.get('/', requireAdmin, auditController.listAuditLogs);
 // Create audit log (can be called from anywhere)
 router.post('/', auditController.createAuditLog);
 
-// Get specific audit log
-router.get('/:id', requireAdmin, auditController.getAuditLog);
-
 // Search by resource
 router.get('/resource/:resourceType/:resourceId', requireAdmin, auditController.getAuditLogsByResource);
 
@@ -33,5 +30,8 @@ router.get('/summary/stats', requireAdmin, auditController.getAuditSummary);
 
 // Delete old logs (admin only)
 router.delete('/old/cleanup', requireAdmin, auditController.deleteOldAuditLogs);
+
+// Get specific audit log
+router.get('/:id', requireAdmin, auditController.getAuditLog);
 
 export default router;

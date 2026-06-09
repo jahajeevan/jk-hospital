@@ -1,23 +1,53 @@
 import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
 
+const inventoryInput = (data = {}) => ({
+  itemName: data.itemName || data.name || 'Medicine',
+  quantity: Number(data.quantity ?? data.currentStock ?? 0),
+  unitPrice: Number(data.unitPrice ?? data.sellingPrice ?? 0),
+  reorderLevel: Number(data.reorderLevel ?? data.minimumStockLevel ?? 10),
+  category: data.category || data.batchNumber || '',
+  supplier: data.supplier || '',
+  expiryDate: data.expiryDate || null,
+  metadata: {
+    ...(data.metadata || {}),
+    batchNumber: data.batchNumber || data.metadata?.batchNumber || '',
+    purchasePrice: Number(data.purchasePrice ?? data.metadata?.purchasePrice ?? 0)
+  }
+});
+
+const inventoryOutput = (row) => {
+  const item = toCamelObj(row);
+  if (!item) return item;
+  return {
+    ...item,
+    name: item.name || item.itemName,
+    batchNumber: item.batchNumber || item.metadata?.batchNumber || item.category || '',
+    purchasePrice: Number(item.purchasePrice ?? item.metadata?.purchasePrice ?? 0),
+    sellingPrice: Number(item.sellingPrice ?? item.unitPrice ?? 0),
+    currentStock: Number(item.currentStock ?? item.quantity ?? 0),
+    minimumStockLevel: Number(item.minimumStockLevel ?? item.reorderLevel ?? 10)
+  };
+};
+
 export const createInventoryItem = async (data) => {
+  const input = inventoryInput(data);
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
     .insert(toSnakeObj({
-      itemName: data.itemName,
-      quantity: data.quantity,
-      unitPrice: data.unitPrice,
-      reorderLevel: data.reorderLevel || 10,
-      category: data.category,
-      supplier: data.supplier,
-      expiryDate: data.expiryDate,
-      metadata: data.metadata || {},
+      itemName: input.itemName,
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      reorderLevel: input.reorderLevel,
+      category: input.category,
+      supplier: input.supplier,
+      expiryDate: input.expiryDate,
+      metadata: input.metadata,
       updatedAt: new Date().toISOString()
     }))
     .select();
 
   if (error) throw error;
-  return toCamelObj(result?.[0]);
+  return inventoryOutput(result?.[0]);
 };
 
 export const getInventoryItem = async (id) => {
@@ -28,7 +58,7 @@ export const getInventoryItem = async (id) => {
     .limit(1);
 
   if (error) throw error;
-  return toCamelObj(result?.[0]) || null;
+  return inventoryOutput(result?.[0]) || null;
 };
 
 export const listInventory = async (limit = 100, offset = 0, category = null) => {
@@ -46,7 +76,7 @@ export const listInventory = async (limit = 100, offset = 0, category = null) =>
   const { data: result, error } = await query;
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(inventoryOutput);
 };
 
 export const getInventoryByCategory = async (category) => {
@@ -57,7 +87,7 @@ export const getInventoryByCategory = async (category) => {
     .order('item_name', { ascending: true });
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(inventoryOutput);
 };
 
 export const getLowStockItems = async (limit = 50) => {
@@ -69,19 +99,25 @@ export const getLowStockItems = async (limit = 50) => {
     .limit(limit);
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(inventoryOutput);
 };
 
 export const updateInventoryItem = async (id, data) => {
   const updateData = {};
-  if (data.itemName !== undefined) updateData.itemName = data.itemName;
-  if (data.quantity !== undefined) updateData.quantity = data.quantity;
-  if (data.unitPrice !== undefined) updateData.unitPrice = data.unitPrice;
-  if (data.reorderLevel !== undefined) updateData.reorderLevel = data.reorderLevel;
+  if (data.itemName !== undefined || data.name !== undefined) updateData.itemName = data.itemName || data.name;
+  if (data.quantity !== undefined || data.currentStock !== undefined) updateData.quantity = Number(data.quantity ?? data.currentStock);
+  if (data.unitPrice !== undefined || data.sellingPrice !== undefined) updateData.unitPrice = Number(data.unitPrice ?? data.sellingPrice);
+  if (data.reorderLevel !== undefined || data.minimumStockLevel !== undefined) updateData.reorderLevel = Number(data.reorderLevel ?? data.minimumStockLevel);
   if (data.category !== undefined) updateData.category = data.category;
   if (data.supplier !== undefined) updateData.supplier = data.supplier;
   if (data.expiryDate !== undefined) updateData.expiryDate = data.expiryDate;
-  if (data.metadata !== undefined) updateData.metadata = data.metadata;
+  if (data.metadata !== undefined || data.batchNumber !== undefined || data.purchasePrice !== undefined) {
+    updateData.metadata = {
+      ...(data.metadata || {}),
+      ...(data.batchNumber !== undefined ? { batchNumber: data.batchNumber } : {}),
+      ...(data.purchasePrice !== undefined ? { purchasePrice: Number(data.purchasePrice) } : {})
+    };
+  }
   updateData.updatedAt = new Date().toISOString();
 
   const { data: result, error } = await supabase
@@ -92,7 +128,7 @@ export const updateInventoryItem = async (id, data) => {
 
   if (error) throw error;
   if (!result || result.length === 0) return null;
-  return toCamelObj(result[0]);
+  return inventoryOutput(result[0]);
 };
 
 export const restockItem = async (id, quantity, notes = '') => {
@@ -116,7 +152,7 @@ export const restockItem = async (id, quantity, notes = '') => {
     .select();
 
   if (error) throw error;
-  return toCamelObj(result?.[0]);
+  return inventoryOutput(result?.[0]);
 };
 
 export const removeStock = async (id, quantity) => {
@@ -134,7 +170,7 @@ export const removeStock = async (id, quantity) => {
     .select();
 
   if (error) throw error;
-  return toCamelObj(result?.[0]);
+  return inventoryOutput(result?.[0]);
 };
 
 export const deleteInventoryItem = async (id) => {
@@ -156,5 +192,5 @@ export const searchInventory = async (query) => {
     .order('item_name', { ascending: true });
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(inventoryOutput);
 };

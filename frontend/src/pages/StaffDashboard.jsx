@@ -87,17 +87,23 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const loadServer = async () => {
     try {
       setLoading(true);
-      let bookingsData = [];
-      if (user?.role === 'doctor') {
-        bookingsData = await fetchUserAppointments();
-      } else {
-        bookingsData = await fetchAppointments();
-      }
+      const load = async (label, fn, fallback = []) => {
+        try {
+          return await fn();
+        } catch (error) {
+          console.warn(`Could not load ${label}:`, error?.friendlyMessage || error?.message || error);
+          return fallback;
+        }
+      };
+
+      const bookingsData = user?.role === 'doctor'
+        ? await load('doctor appointments', fetchUserAppointments)
+        : await load('appointments', fetchAppointments);
       const [doctorsData, inventoryData, notificationsData, auditLogsData] = await Promise.all([
-        fetchDoctors(),
-        fetchPharmacyInventory(),
-        fetchNotifications(),
-        fetchAuditLogs()
+        load('doctors', fetchDoctors),
+        load('pharmacy inventory', fetchPharmacyInventory),
+        load('notifications', fetchNotifications),
+        user?.role === 'admin' ? load('audit logs', fetchAuditLogs) : Promise.resolve([])
       ]);
       
       setBookings(Array.isArray(bookingsData) ? bookingsData : []);
@@ -105,14 +111,6 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
       setInventory(Array.isArray(inventoryData) ? inventoryData : []);
       setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
       setAuditLogs(Array.isArray(auditLogsData) ? auditLogsData : []);
-    } catch (error) {
-      console.error('Error loading staff data:', error);
-      toast.error('Could not load staff data');
-      setBookings([]);
-      setDoctors([]);
-      setInventory([]);
-      setNotifications([]);
-      setAuditLogs([]);
     } finally {
       setLoading(false);
     }

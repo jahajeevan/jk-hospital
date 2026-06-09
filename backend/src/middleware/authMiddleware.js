@@ -21,7 +21,7 @@ const getPrimaryEmail = (clerkUser) =>
 
 const roleFromClerkUser = (clerkUser, email) => {
   const metadataRole = clerkUser.publicMetadata?.role || clerkUser.privateMetadata?.role;
-  if (['admin', 'doctor', 'receptionist', 'staff', 'patient'].includes(metadataRole)) return metadataRole;
+  if (['admin', 'doctor', 'receptionist', 'pharmacist', 'staff', 'patient'].includes(metadataRole)) return metadataRole;
   return adminEmails.has(normalizeEmail(email)) ? 'admin' : 'patient';
 };
 

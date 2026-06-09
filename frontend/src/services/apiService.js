@@ -76,10 +76,10 @@ export const fetchDoctor = async (id) => {
 
 export const fetchDoctorSlots = async (doctorId, date) => {
   try {
-    const response = await api.get(`/doctors/${doctorId}/slots`, {
+    const response = await api.get(`/doctors/${doctorId}/availability`, {
       params: { date },
     });
-    return response.data || [];
+    return response.data?.slots || response.data || [];
   } catch (error) {
     console.error(`Error fetching slots for doctor ${doctorId}:`, error);
     throw error;
@@ -116,10 +116,20 @@ export const updateDoctor = async (id, updates) => {
 
 export const updateDoctorSlot = async (doctorId, slotId, updates) => {
   try {
-    const response = await api.patch(`/doctors/${doctorId}/slots/${slotId}`, updates);
-    return response.data;
+    const response = await api.patch(`/admin/doctors/${doctorId}/slots/${slotId}`, updates);
+    return response.data?.slot || response.data;
   } catch (error) {
     console.error(`Error updating slot ${slotId} for doctor ${doctorId}:`, error);
+    throw error;
+  }
+};
+
+export const createDoctorSlot = async (doctorId, slotData) => {
+  try {
+    const response = await api.post(`/admin/doctors/${doctorId}/slots`, slotData);
+    return response.data?.slot || response.data;
+  } catch (error) {
+    console.error(`Error creating slot for doctor ${doctorId}:`, error);
     throw error;
   }
 };
@@ -305,7 +315,7 @@ export const updateMedicalRecord = async (id, updates) => {
 export const fetchPharmacyInventory = async (filters = {}) => {
   try {
     const response = await api.get('/pharmacy-inventory', { params: filters });
-    return response.data || [];
+    return response.data?.items || response.data || [];
   } catch (error) {
     console.error('Error fetching pharmacy inventory:', error);
     throw error;
@@ -325,7 +335,7 @@ export const fetchInventoryItem = async (id) => {
 export const createInventoryItem = async (itemData) => {
   try {
     const response = await api.post('/pharmacy-inventory', itemData);
-    return response.data;
+    return response.data?.item || response.data;
   } catch (error) {
     console.error('Error creating inventory item:', error);
     throw error;
@@ -335,7 +345,7 @@ export const createInventoryItem = async (itemData) => {
 export const updateInventoryItem = async (id, updates) => {
   try {
     const response = await api.patch(`/pharmacy-inventory/${id}`, updates);
-    return response.data;
+    return response.data?.item || response.data;
   } catch (error) {
     console.error(`Error updating inventory item ${id}:`, error);
     throw error;
@@ -407,7 +417,7 @@ export const updatePharmacyBill = async (id, updates) => {
 export const fetchAuditLogs = async (filters = {}) => {
   try {
     const response = await api.get('/audit-logs', { params: filters });
-    return response.data || [];
+    return response.data?.logs || response.data || [];
   } catch (error) {
     console.error('Error fetching audit logs:', error);
     throw error;
@@ -428,7 +438,7 @@ export const createAuditLog = async (logData) => {
 export const fetchNotifications = async (filters = {}) => {
   try {
     const response = await api.get('/notifications', { params: filters });
-    return response.data || [];
+    return response.data?.notifications || response.data || [];
   } catch (error) {
     console.error('Error fetching notifications:', error);
     throw error;
@@ -438,7 +448,7 @@ export const fetchNotifications = async (filters = {}) => {
 export const createNotification = async (notificationData) => {
   try {
     const response = await api.post('/notifications', notificationData);
-    return response.data;
+    return response.data?.notification || response.data;
   } catch (error) {
     console.error('Error creating notification:', error);
     // Don't throw - notifications are non-critical

@@ -7,6 +7,32 @@ const hashPassword = async (password) => {
   return bcrypt.hash(password, 12);
 };
 
+const pickDefined = (value) =>
+  Object.fromEntries(Object.entries(value).filter(([, entryValue]) => entryValue !== undefined));
+
+const doctorDbInput = (input = {}) => pickDefined({
+  name: input.name,
+  specialty: input.specialty || input.specialization || input.department || 'General Medicine',
+  bio: input.bio,
+  fee: input.fee,
+  avatar: input.avatar,
+  isAvailable: input.isAvailable,
+  unavailableDates: input.unavailableDates
+});
+
+const slotDbInput = (input = {}, doctorId) => pickDefined({
+  doctorId,
+  label: input.label,
+  startTime: input.startTime,
+  endTime: input.endTime,
+  tokenLimit: input.tokenLimit,
+  fee: input.fee,
+  isActive: input.isActive,
+  availableFrom: input.availableFrom || null,
+  availableUntil: input.availableUntil || null,
+  advanceBookingMinutes: input.advanceBookingMinutes
+});
+
 export const overview = asyncHandler(async (_req, res) => {
   const [
     { count: appointments },
@@ -88,9 +114,7 @@ export const allBookings = asyncHandler(async (_req, res) => {
 export const upsertDoctor = asyncHandler(async (req, res) => {
   const slots = req.body.slots || [];
   const { email, password } = req.body;
-  const bodyCopy = { ...req.body };
-  delete bodyCopy.slots;
-  delete bodyCopy.password; // Don't store password in doctor table
+  const bodyCopy = doctorDbInput(req.body);
 
   let doctor;
   if (req.params.id) {
@@ -122,7 +146,6 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
           name: bodyCopy.name,
           role: 'doctor',
           isVerified: true,
-          linkedDoctorId: doctor.id,
           passwordChangedAt: new Date()
         }));
 
@@ -132,23 +155,16 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
     }
   }
 
-  // Sync slots to relational table
-  if (slots.length && doctor?.id) {
-    await supabase.from('doctor_slots').delete().eq('doctor_id', doctor.id);
+  // Slot create/update/delete is handled by dedicated endpoints so profile edits cannot damage slot rows.
+  if (!req.params.id && slots.length && doctor?.id) {
     const slotsToInsert = slots.map((s) => {
-      const mapped = toSnakeObj(s);
-
-      mapped.doctor_id = doctor.id;
-
-      delete mapped.id;
-      delete mapped._id;
-      delete mapped.date; // <-- ADD THIS
-
+      const mapped = toSnakeObj(slotDbInput(s, doctor.id));
+      if (s.id || s._id) mapped.id = s.id || s._id;
       return mapped;
     });
     const { error: slotsErr } = await supabase
       .from('doctor_slots')
-      .insert(slotsToInsert);
+      .upsert(slotsToInsert, { onConflict: 'id' });
 
     if (slotsErr) {
       console.error('DOCTOR SLOT ERROR:', slotsErr);
@@ -167,10 +183,50 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
   res.status(req.params.id ? 200 : 201).json({ doctor: toCamelObj(fullDoc?.[0]) });
 });
 
-export const deleteDoctor = asyncHandler(async (req, res) => {
-  // Delete doctor's user account too
-  await supabase.from('users').delete().eq('linkedDoctorId', req.params.id);
+export const createDoctorSlot = asyncHandler(async (req, res) => {
+  const { data: doctors } = await supabase
+    .from('doctors')
+    .select('id')
+    .eq('id', req.params.id)
+    .is('deleted_at', null)
+    .limit(1);
+  if (!doctors?.[0]) {
+    const error = new Error('Doctor not found');
+    error.statusCode = 404;
+    throw error;
+  }
 
+  const slotInput = slotDbInput(req.body, req.params.id);
+  const { data: slots, error } = await supabase
+    .from('doctor_slots')
+    .insert(toSnakeObj(slotInput))
+    .select('*');
+  if (error) throw error;
+
+  res.status(201).json({ slot: toCamelObj(slots?.[0]) });
+});
+
+export const updateDoctorSlot = asyncHandler(async (req, res) => {
+  const slotInput = slotDbInput(req.body, req.params.id);
+  delete slotInput.doctorId;
+
+  const { data: slots, error } = await supabase
+    .from('doctor_slots')
+    .update(toSnakeObj(slotInput))
+    .eq('id', req.params.slotId)
+    .eq('doctor_id', req.params.id)
+    .select('*');
+  if (error) throw error;
+  if (!slots?.[0]) {
+    const notFound = new Error('Slot not found');
+    notFound.statusCode = 404;
+    throw notFound;
+  }
+
+  res.json({ slot: toCamelObj(slots[0]) });
+});
+
+export const deleteDoctor = asyncHandler(async (req, res) => {
   // Delete doctor slots
   await supabase.from('doctor_slots').delete().eq('doctor_id', req.params.id);
 

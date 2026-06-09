@@ -52,7 +52,9 @@ export const searchInventory = asyncHandler(async (req, res) => {
 });
 
 export const createItem = asyncHandler(async (req, res) => {
-  const { itemName, quantity, unitPrice } = req.body;
+  const itemName = req.body.itemName || req.body.name;
+  const quantity = req.body.quantity ?? req.body.currentStock;
+  const unitPrice = req.body.unitPrice ?? req.body.sellingPrice;
 
   if (!itemName) {
     const error = new Error('Item name is required');

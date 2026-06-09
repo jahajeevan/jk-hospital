@@ -1,23 +1,41 @@
-import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
+import { supabase, toCamelObj } from '../config/supabase.js';
+
+const auditOutput = (row) => {
+  const log = toCamelObj(row);
+  if (!log) return log;
+  return {
+    ...log,
+    actor: log.actor || log.actorId || 'system',
+    actorRole: log.actorRole || log.metadata?.actorRole || '',
+    resourceType: log.resourceType || log.resource || '',
+    details: log.details || log.metadata || {},
+    ipAddress: log.ipAddress || log.ip || '',
+    timestamp: log.timestamp || log.createdAt
+  };
+};
 
 export const createAuditLog = async (data) => {
   const { data: result, error } = await supabase
     .from('audit_logs')
-    .insert(toSnakeObj({
-      actor: data.actor,
-      actorRole: data.actorRole,
+    .insert({
+      actor_id: data.actorId || (/^[0-9a-f-]{36}$/i.test(String(data.actor || '')) ? data.actor : null),
       action: data.action,
-      resourceType: data.resourceType,
-      resourceId: data.resourceId,
-      details: data.details || {},
-      ipAddress: data.ipAddress,
-      userAgent: data.userAgent,
-      createdAt: new Date().toISOString()
-    }))
+      resource: data.resourceType || data.resource || 'system',
+      resource_id: data.resourceId || null,
+      request_id: data.requestId || null,
+      ip: data.ipAddress || data.ip || null,
+      user_agent: data.userAgent || null,
+      metadata: {
+        actor: data.actor || 'system',
+        actorRole: data.actorRole || '',
+        details: data.details || {}
+      },
+      created_at: new Date().toISOString()
+    })
     .select();
 
   if (error) throw error;
-  return toCamelObj(result?.[0]);
+  return auditOutput(result?.[0]);
 };
 
 export const getAuditLog = async (id) => {
@@ -28,7 +46,7 @@ export const getAuditLog = async (id) => {
     .limit(1);
 
   if (error) throw error;
-  return toCamelObj(result?.[0]) || null;
+  return auditOutput(result?.[0]) || null;
 };
 
 export const listAuditLogs = async (limit = 100, offset = 0, filters = {}) => {
@@ -37,16 +55,12 @@ export const listAuditLogs = async (limit = 100, offset = 0, filters = {}) => {
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (filters.actor) {
-    query = query.eq('actor', filters.actor);
-  }
-
   if (filters.action) {
     query = query.eq('action', filters.action);
   }
 
   if (filters.resourceType) {
-    query = query.eq('resource_type', filters.resourceType);
+    query = query.eq('resource', filters.resourceType);
   }
 
   if (filters.resourceId) {
@@ -66,31 +80,31 @@ export const listAuditLogs = async (limit = 100, offset = 0, filters = {}) => {
   const { data: result, error } = await query;
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(auditOutput);
 };
 
 export const getAuditLogsByResource = async (resourceType, resourceId) => {
   const { data: result, error } = await supabase
     .from('audit_logs')
     .select('*')
-    .eq('resource_type', resourceType)
+    .eq('resource', resourceType)
     .eq('resource_id', resourceId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(auditOutput);
 };
 
 export const getAuditLogsByActor = async (actor, limit = 50, offset = 0) => {
   const { data: result, error } = await supabase
     .from('audit_logs')
     .select('*')
-    .eq('actor', actor)
+    .contains('metadata', { actor })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(auditOutput);
 };
 
 export const getAuditLogsByAction = async (action, limit = 50, offset = 0) => {
@@ -102,7 +116,7 @@ export const getAuditLogsByAction = async (action, limit = 50, offset = 0) => {
     .range(offset, offset + limit - 1);
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(auditOutput);
 };
 
 export const getAuditLogsByDateRange = async (startDate, endDate, limit = 100, offset = 0) => {
@@ -115,7 +129,7 @@ export const getAuditLogsByDateRange = async (startDate, endDate, limit = 100, o
     .range(offset, offset + limit - 1);
 
   if (error) throw error;
-  return toCamelObj(result || []);
+  return (result || []).map(auditOutput);
 };
 
 export const exportAuditLogs = async (filters = {}) => {
@@ -150,7 +164,7 @@ export const getAuditSummary = async (startDate, endDate) => {
   // Get counts by actor
   const { data: actorCounts, error: actorError } = await supabase
     .from('audit_logs')
-    .select('actor', { count: 'exact' })
+    .select('metadata', { count: 'exact' })
     .gte('created_at', startDate)
     .lte('created_at', endDate);
 

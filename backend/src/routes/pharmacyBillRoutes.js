@@ -8,11 +8,11 @@ const router = express.Router();
 router.get('/mine', requireUser, billController.getUserBills);
 router.post('/', requireUser, billController.createBill);
 
-// Get specific bill
-router.get('/:id', requireUser, billController.getBillDetail);
-
 // Get bill by appointment (nested route)
 router.get('/appointment/:appointmentId', requireUser, billController.getAppointmentBill);
+
+// Get specific bill
+router.get('/:id', requireUser, billController.getBillDetail);
 
 // Item management
 router.post('/:id/items', requireUser, billController.addItems);

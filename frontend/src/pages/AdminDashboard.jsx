@@ -10,7 +10,7 @@ import MetricCard from '../components/MetricCard.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
 import { DEPARTMENTS } from '../utils/localStore.js';
-import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor as updateDoctorApi, updateDoctorSlot, createDoctor as createDoctorApi, updateAppointment, deleteDoctor as deleteDoctorApi, deleteSlot as deleteSlotApi } from '../services/apiService.js';
+import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor as updateDoctorApi, updateDoctorSlot, createDoctorSlot as createDoctorSlotApi, createDoctor as createDoctorApi, updateAppointment, deleteDoctor as deleteDoctorApi, deleteSlot as deleteSlotApi } from '../services/apiService.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { MIN_CONSULTATION_FEE, normalizeFee } from '../utils/paymentRules.js';
 import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl } from '../utils/validation.js';
@@ -464,9 +464,7 @@ export default function AdminDashboard() {
         return;
       }
       
-      // Create new slot object
       const newSlot = {
-        _id: `slot_${Date.now()}`, // Generate temporary ID
         label: slotForm.label.trim(),
         date: slotForm.date,
         availableFrom: slotForm.availableFrom,
@@ -481,15 +479,7 @@ export default function AdminDashboard() {
         advanceBookingMinutes: Number(slotForm.advanceBookingMinutes),
         isActive: slotForm.isActive
       };
-      
-      // Update doctor with new slot
-      const updatedDoctor = {
-        ...doctor,
-        slots: [...(doctor.slots || []), newSlot]
-      };
-      
-      // Update on server
-      await updateDoctorApi(doctorId, updatedDoctor);
+      await createDoctorSlotApi(doctorId, newSlot);
       
       // Refresh doctors list
       const freshDoctors = await fetchDoctors();

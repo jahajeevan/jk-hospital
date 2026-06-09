@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   clerk_id VARCHAR UNIQUE,
   phone VARCHAR,
   password VARCHAR NOT NULL,
-  role VARCHAR NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor', 'admin', 'receptionist', 'staff')),
+  role VARCHAR NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor', 'admin', 'receptionist', 'pharmacist', 'staff')),
   is_verified BOOLEAN NOT NULL DEFAULT FALSE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   failed_login_attempts INTEGER NOT NULL DEFAULT 0,
