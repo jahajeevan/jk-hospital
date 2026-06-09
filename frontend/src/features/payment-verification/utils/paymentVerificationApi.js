@@ -51,10 +51,16 @@ export const createRazorpayOrder = async (payload) => {
  * @param {number} amount
  * @returns {Promise<{ verified: boolean, payment: VerifiedPayment }>}
  */
-export const verifyRazorpayPayment = async (razorpayResponse, amount) => {
+export const verifyRazorpayPayment = async (razorpayResponse, amount, booking) => {
   const { data } = await api.post('/payments/razorpay-order/verify', {
     ...razorpayResponse,
-    amount
+    amount,
+    booking: booking ? {
+      doctorId: booking.doctor?._id || booking.doctor?.id,
+      slotId: booking.slot?._id || booking.slot?.id,
+      appointmentDate: booking.date,
+      patientDetails: booking.patient
+    } : undefined
   });
   return data;
 };
@@ -72,8 +78,16 @@ export const createStripeCheckoutSession = async (payload) => {
  * @param {string} sessionId
  * @returns {Promise<{ verified: boolean, payment: VerifiedPayment }>}
  */
-export const confirmStripeSession = async (sessionId) => {
-  const { data } = await api.post('/payments/local-checkout-session/confirm', { sessionId });
+export const confirmStripeSession = async (sessionId, booking) => {
+  const { data } = await api.post('/payments/local-checkout-session/confirm', {
+    sessionId,
+    booking: booking ? {
+      doctorId: booking.doctor?._id || booking.doctor?.id,
+      slotId: booking.slot?._id || booking.slot?.id,
+      appointmentDate: booking.date,
+      patientDetails: booking.patient
+    } : undefined
+  });
   return data;
 };
 

@@ -103,24 +103,30 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     .limit(1);
 
   const populated = toCamelObj(populatedData?.[0]);
-  const invoiceBuffer = await createInvoiceBuffer(populated, paid);
-  
-  await sendAppointmentEmail(user.email, populated);
-  await sendMail({
-    to: user.email,
-    subject: 'JK Hospital Invoice',
-    html: '<p>Your appointment invoice is attached.</p>',
-    attachments: [{ filename: `${appointment.invoiceNumber}.pdf`, content: invoiceBuffer }]
-  });
+  try {
+    const invoiceBuffer = await createInvoiceBuffer(populated, paid);
+    await sendAppointmentEmail(user.email, populated);
+    await sendMail({
+      to: user.email,
+      subject: 'JK Hospital Invoice',
+      html: '<p>Your appointment invoice is attached.</p>',
+      attachments: [{ filename: `${appointment.invoiceNumber}.pdf`, content: invoiceBuffer }]
+    });
+  } catch (notificationError) {
+    console.warn('Appointment email/invoice notification skipped:', notificationError?.message || notificationError);
+  }
 
-  await supabase
+  const { error: notificationError } = await supabase
     .from('notifications')
     .insert(toSnakeObj({
-      user: user._id,
+      userId: user._id,
       title: 'Appointment confirmed',
       message: `Token ${appointment.tokenNumber} confirmed with ${doctor.name}.`,
       type: 'appointment'
     }));
+  if (notificationError) {
+    console.warn('Appointment notification row skipped:', notificationError.message || notificationError);
+  }
 
   return populated;
 };
@@ -454,4 +460,3 @@ export const syncAppointment = asyncHandler(async (req, res) => {
 
   res.status(201).json({ success: true, appointment: toCamelObj(newApt) });
 });
-

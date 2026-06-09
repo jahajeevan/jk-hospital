@@ -23,7 +23,7 @@ export default function PaymentVerificationModal({
   message = '',
   volume = 0.85,
   onVolumeChange,
-  voiceEnabled = true,
+  voiceEnabled = false,
   onVoiceToggle
 }) {
   const show = open && status !== 'idle';

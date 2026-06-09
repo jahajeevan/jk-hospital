@@ -123,7 +123,7 @@ export const createRazorpayOrder = asyncHandler(async (req, res) => {
 });
 
 export const verifyRazorpayOrder = asyncHandler(async (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, booking } = req.body;
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     const error = new Error('Missing Razorpay verification details');
     error.statusCode = 400;
@@ -156,19 +156,33 @@ export const verifyRazorpayOrder = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  const paymentInput = {
+    amount: Number(razorpayPayment.amount) / 100,
+    currency: razorpayPayment.currency || 'INR',
+    method: 'razorpay',
+    status: 'success',
+    transactionId: razorpay_payment_id,
+    razorpayOrderId: razorpay_order_id,
+    razorpayPaymentId: razorpay_payment_id,
+    razorpayPaymentMethod: razorpayPayment.method,
+    paidAt: new Date().toISOString()
+  };
+
+  if (booking?.doctorId && booking?.slotId && booking?.appointmentDate && booking?.patientDetails) {
+    const appointment = await createConfirmedAppointment({
+      user: req.user,
+      doctorId: booking.doctorId,
+      slotId: booking.slotId,
+      appointmentDate: booking.appointmentDate,
+      patientDetails: booking.patientDetails,
+      paymentInput
+    });
+    return res.status(201).json({ verified: true, payment: appointment.payment, appointment, invoiceReady: true });
+  }
+
   res.json({
     verified: true,
-    payment: {
-      amount: Number(razorpayPayment.amount) / 100,
-      currency: razorpayPayment.currency || 'INR',
-      method: 'razorpay',
-      status: 'success',
-      transactionId: razorpay_payment_id,
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      razorpayPaymentMethod: razorpayPayment.method,
-      paidAt: new Date().toISOString()
-    }
+    payment: paymentInput
   });
 });
 
@@ -290,7 +304,7 @@ export const createLocalCheckoutSession = asyncHandler(async (req, res) => {
 });
 
 export const confirmLocalCheckoutSession = asyncHandler(async (req, res) => {
-  const { sessionId } = req.body;
+  const { sessionId, booking } = req.body;
   const session = await runStripe(() =>
     getStripe().checkout.sessions.retrieve(sessionId, {
       expand: ['payment_intent']
@@ -309,18 +323,32 @@ export const confirmLocalCheckoutSession = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  const paymentInput = {
+    amount: session.amount_total / 100,
+    currency: session.currency?.toUpperCase() || 'INR',
+    method: 'stripe',
+    status: 'success',
+    transactionId: session.id,
+    stripeSessionId: session.id,
+    stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id,
+    paidAt: new Date().toISOString()
+  };
+
+  if (booking?.doctorId && booking?.slotId && booking?.appointmentDate && booking?.patientDetails) {
+    const appointment = await createConfirmedAppointment({
+      user: req.user,
+      doctorId: booking.doctorId,
+      slotId: booking.slotId,
+      appointmentDate: booking.appointmentDate,
+      patientDetails: booking.patientDetails,
+      paymentInput
+    });
+    return res.status(201).json({ verified: true, payment: appointment.payment, appointment, invoiceReady: true });
+  }
+
   res.json({
     verified: true,
-    payment: {
-      amount: session.amount_total / 100,
-      currency: session.currency?.toUpperCase() || 'INR',
-      method: 'stripe',
-      status: 'success',
-      transactionId: session.id,
-      stripeSessionId: session.id,
-      stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id,
-      paidAt: new Date().toISOString()
-    }
+    payment: paymentInput
   });
 });
 

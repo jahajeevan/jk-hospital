@@ -36,10 +36,12 @@ const hashPassword = async (password) => {
 
 const authResponse = async (req, res, user, statusCode = 200) => {
   const { token: refreshToken } = await createRefreshToken({ user, req });
-  res.cookie(env.refreshTokenCookieName, refreshToken, {
-    ...cookieOptions,
-    maxAge: env.refreshTokenExpiresDays * 24 * 60 * 60 * 1000
-  });
+  if (refreshToken) {
+    res.cookie(env.refreshTokenCookieName, refreshToken, {
+      ...cookieOptions,
+      maxAge: env.refreshTokenExpiresDays * 24 * 60 * 60 * 1000
+    });
+  }
   return res.status(statusCode).json({ token: signToken(user), user: publicUser(user) });
 };
 

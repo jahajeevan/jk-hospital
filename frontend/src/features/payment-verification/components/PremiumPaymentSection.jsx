@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
-  Volume2,
   Wallet
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -25,14 +24,12 @@ import {
   fetchPaymentConfig,
   getVerificationErrorMessage
 } from '../utils/paymentVerificationApi.js';
-import { setVoiceFeedbackEnabled } from '../utils/voiceFeedback.js';
 import PaymentVerificationModal from './PaymentVerificationModal.jsx';
 import VerificationStatusDisplay from './VerificationStatusDisplay.jsx';
 
 const BOOKING_KEY = 'jk_pending_payment_booking';
 const PAYMENT_MODE_KEY = 'jk_pending_payment_mode';
 const PROVIDER_KEY = 'jk_pending_payment_provider';
-const VOICE_PREF_KEY = 'jk_payment_voice_enabled';
 
 const paymentModes = [
   { id: 'upi', label: 'UPI', detail: 'GPay, PhonePe, BHIM', Icon: Smartphone },
@@ -77,10 +74,8 @@ export default function PremiumPaymentSection({ booking, user }) {
   const [gateway, setGateway] = useState('razorpay');
   const [selectedMode, setSelectedMode] = useState('upi');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   const verification = usePaymentVerification({
-    enableVoice: voiceEnabled,
     volume: 0.85
   });
 
@@ -98,10 +93,6 @@ export default function PremiumPaymentSection({ booking, user }) {
       ['Slot', booking.slot.label]
     ];
   }, [booking, user]);
-
-  useEffect(() => {
-    setVoiceFeedbackEnabled(voiceEnabled);
-  }, [voiceEnabled]);
 
   const loadPaymentConfig = useCallback(() => {
     setConfigLoading(true);
@@ -152,9 +143,7 @@ export default function PremiumPaymentSection({ booking, user }) {
       setSearchParams({}, { replace: true });
       const appointment = await verifyStripe(booking, user, sessionId);
       if (appointment) {
-        setTimeout(() => {
           navigate('/payment-success', { replace: true, state: { appointment } });
-        }, 900);
       }
     };
     void completeStripe();
@@ -217,9 +206,7 @@ export default function PremiumPaymentSection({ booking, user }) {
           setCheckoutLoading(false);
           const appointment = await verifyRazorpay(booking, user, response, amount);
           if (appointment) {
-            setTimeout(() => {
-              navigate('/payment-success', { replace: true, state: { appointment } });
-            }, 900);
+            navigate('/payment-success', { replace: true, state: { appointment } });
           }
         },
         modal: {
@@ -273,8 +260,7 @@ export default function PremiumPaymentSection({ booking, user }) {
         message={errorMessage}
         volume={audio.volume}
         onVolumeChange={audio.setVolume}
-        voiceEnabled={voiceEnabled}
-        onVoiceToggle={setVoiceEnabled}
+        voiceEnabled={false}
       />
 
       <div className="container-pad grid gap-6 lg:grid-cols-[1fr_0.85fr]">
@@ -377,10 +363,7 @@ export default function PremiumPaymentSection({ booking, user }) {
               <VerificationStatusDisplay status={status} message={errorMessage} />
             )}
 
-            <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
-              <Volume2 size={14} />
-              <span>Sound · haptics · voice on verify</span>
-            </div>
+            <p className="mt-4 text-xs text-slate-500">Token appears immediately after server-side payment verification.</p>
 
             {checkoutError && (
               <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">

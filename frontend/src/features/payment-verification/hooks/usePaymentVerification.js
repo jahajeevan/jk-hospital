@@ -1,5 +1,5 @@
 /**
- * Async payment verification state machine with audio, haptics, and voice feedback.
+ * Async payment verification state machine with audio and haptics.
  */
 
 import { useCallback, useRef, useState } from 'react';
@@ -13,17 +13,11 @@ import {
   verifyRazorpayPayment
 } from '../utils/paymentVerificationApi.js';
 import { triggerElectronHaptic } from '../utils/haptics.js';
-import {
-  isVoiceFeedbackEnabled,
-  speakPaymentFailure,
-  speakPaymentSuccess
-} from '../utils/voiceFeedback.js';
 
 /** @typedef {'idle' | 'processing' | 'success' | 'failure'} VerificationStatus */
 
 /**
  * @typedef {Object} UsePaymentVerificationOptions
- * @property {boolean} [enableVoice]
  * @property {boolean} [enableHaptics]
  * @property {number} [volume]
  * @property {boolean} [showToast] — surface errors via toast (default false)
@@ -33,7 +27,7 @@ import {
  * @param {UsePaymentVerificationOptions} [options]
  */
 export function usePaymentVerification(options = {}) {
-  const { enableVoice = true, enableHaptics = true, volume = 0.85, showToast = false } = options;
+  const { enableHaptics = true, volume = 0.85, showToast = false } = options;
   const audio = usePaymentAudio({ initialVolume: volume });
   const [status, setStatus] = useState(/** @type {VerificationStatus} */ ('idle'));
   const [errorMessage, setErrorMessage] = useState('');
@@ -63,20 +57,18 @@ export function usePaymentVerification(options = {}) {
 
       try {
         const result = await verifyFn();
-        const appointmentData = {
+        const appointment = result.appointment || await createAppointment({
           doctor: booking.doctor,
           slot: booking.slot,
           date: booking.date,
           patient: booking.patient,
           payment: result.payment
-        };
-        const appointment = await createAppointment(appointmentData);
+        });
         setLastPayment(result.payment);
         setStatus('success');
         audio.stopAll();
         await audio.playSuccess();
         if (enableHaptics) triggerElectronHaptic('success');
-        if (enableVoice || isVoiceFeedbackEnabled()) speakPaymentSuccess();
         if (showToast) toast.success('Payment verified successfully', { icon: '✓' });
         return appointment;
       } catch (error) {
@@ -86,14 +78,13 @@ export function usePaymentVerification(options = {}) {
         audio.stopAll();
         await audio.playFailure();
         if (enableHaptics) triggerElectronHaptic('failure');
-        if (enableVoice || isVoiceFeedbackEnabled()) speakPaymentFailure();
         if (showToast) toast.error(message);
         return null;
       } finally {
         verifyingRef.current = false;
       }
     },
-    [audio, enableHaptics, enableVoice, showToast]
+    [audio, enableHaptics, showToast]
   );
 
   /**
@@ -104,7 +95,7 @@ export function usePaymentVerification(options = {}) {
       runVerification({
         booking,
         user,
-        verifyFn: async () => verifyRazorpayPayment(razorpayResponse, amount)
+        verifyFn: async () => verifyRazorpayPayment(razorpayResponse, amount, booking)
       }),
     [runVerification]
   );
@@ -117,7 +108,7 @@ export function usePaymentVerification(options = {}) {
       runVerification({
         booking,
         user,
-        verifyFn: async () => confirmStripeSession(sessionId)
+        verifyFn: async () => confirmStripeSession(sessionId, booking)
       }),
     [runVerification]
   );

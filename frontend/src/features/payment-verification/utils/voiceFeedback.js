@@ -2,8 +2,8 @@
  * Optional speech synthesis for payment verification outcomes.
  */
 
-/** Voice feedback on by default; toggle via modal or setVoiceFeedbackEnabled(). */
-let enabled = true;
+/** Optional speech synthesis utility; payment UI keeps this disabled by default. */
+let enabled = false;
 
 export const setVoiceFeedbackEnabled = (value) => {
   enabled = Boolean(value);

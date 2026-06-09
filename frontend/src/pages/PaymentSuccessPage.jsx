@@ -5,11 +5,6 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import SuccessConfetti from '../features/payment-verification/components/SuccessConfetti.jsx';
 import { playSuccessSound } from '../features/payment-verification/utils/audioManager.js';
 import { triggerElectronHaptic } from '../features/payment-verification/utils/haptics.js';
-import {
-  isVoiceFeedbackEnabled,
-  setVoiceFeedbackEnabled,
-  speakPaymentSuccess
-} from '../features/payment-verification/utils/voiceFeedback.js';
 import { downloadInvoice } from '../utils/invoice.js';
 
 const providerLabel = (method) => {
@@ -25,7 +20,6 @@ export default function PaymentSuccessPage() {
   useEffect(() => {
     void playSuccessSound();
     triggerElectronHaptic('success');
-    if (isVoiceFeedbackEnabled()) speakPaymentSuccess();
   }, []);
 
   if (!appointment) return <Navigate to="/book" replace />;
