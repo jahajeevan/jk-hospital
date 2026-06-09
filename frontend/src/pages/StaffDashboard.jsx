@@ -15,6 +15,7 @@ import {
   createWalkInBooking
 } from '../utils/localStore.js';
 import { fetchUserAppointments, fetchAppointments, fetchDoctors, fetchAuditLogs, fetchPharmacyInventory, fetchNotifications, fetchInventoryItem, updateInventoryItem, createInventoryItem, deleteInventoryItem } from '../services/apiService.js';
+import { getDoctorDepartment } from '../utils/doctorUtils.js';
 
 const tabs = [
   ['reception', 'Reception'],
@@ -327,7 +328,7 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
                 </select>
                 <select className="field" value={walkIn.doctorId} onChange={(e) => setWalkIn((v) => ({ ...v, doctorId: e.target.value, slotId: '' }))}>
                   <option value="">Select doctor</option>
-                  {doctors.filter((doctor) => doctor.department === walkIn.department).map((doctor) => <option key={doctor._id} value={doctor._id}>{doctor.name}</option>)}
+                  {doctors.filter((doctor) => getDoctorDepartment(doctor) === walkIn.department).map((doctor) => <option key={doctor._id} value={doctor._id}>{doctor.name}</option>)}
                 </select>
                 <input className="field" type="date" min={todayLocal()} value={walkIn.date} onChange={(e) => setWalkIn((v) => ({ ...v, date: e.target.value, slotId: '' }))} />
                 <div className="grid gap-2">

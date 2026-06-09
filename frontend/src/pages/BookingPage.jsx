@@ -8,6 +8,7 @@ import BookingStepper from '../components/BookingStepper.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchDoctors, fetchDoctorSlots } from '../services/apiService.js';
 import { DEPARTMENTS, getSlotAvailability } from '../utils/localStore.js';
+import { getDoctorDepartment } from '../utils/doctorUtils.js';
 import { normalizeFee } from '../utils/paymentRules.js';
 import { cleanIndianMobile, isValidIndianMobile } from '../utils/validation.js';
 
@@ -53,9 +54,9 @@ export default function BookingPage() {
         if (state?.doctorId) {
           setDoctorId(state.doctorId);
           const doctor = data.find((d) => d._id === state.doctorId);
-          if (doctor) setDepartment(doctor.department || DEPARTMENTS[0]);
+          if (doctor) setDepartment(getDoctorDepartment(doctor));
         } else {
-          const firstDoctor = data.find((d) => d.department === DEPARTMENTS[0]);
+          const firstDoctor = data.find((d) => getDoctorDepartment(d) === DEPARTMENTS[0]);
           if (firstDoctor) setDoctorId(firstDoctor._id);
         }
       } catch (error) {
@@ -68,7 +69,7 @@ export default function BookingPage() {
     loadDoctors();
   }, [state?.doctorId]);
 
-  const departmentDoctors = doctors.filter((item) => item.department === department);
+  const departmentDoctors = doctors.filter((item) => getDoctorDepartment(item) === department);
   const doctor = departmentDoctors.find((item) => item._id === doctorId) || departmentDoctors[0];
   const slots = (doctor?.slots || []).filter((item) => item.isActive !== false && (!item.date || item.date === date));
   const slot = slots.find((item) => item._id === slotId);
@@ -88,7 +89,7 @@ export default function BookingPage() {
   }, [slotId, slots]);
 
   useEffect(() => {
-    if (!departmentDoctors.some((item) => item._id === doctorId)) {
+      if (!departmentDoctors.some((item) => item._id === doctorId)) {
       setDoctorId(departmentDoctors[0]?._id || '');
       setSlotId('');
     }
@@ -169,14 +170,14 @@ export default function BookingPage() {
                     <h2 className="flex items-center gap-2 text-xl font-bold"><UserRound size={20} /> Choose department</h2>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       {DEPARTMENTS.map((item) => {
-                        const count = doctors.filter((doctorItem) => doctorItem.department === item).length;
+                        const count = doctors.filter((doctorItem) => getDoctorDepartment(doctorItem) === item).length;
                         return (
                           <button
                             key={item}
                             type="button"
                             onClick={() => {
                               setDepartment(item);
-                              setDoctorId(doctors.find((doctorItem) => doctorItem.department === item)?._id || '');
+                              setDoctorId(doctors.find((doctorItem) => getDoctorDepartment(doctorItem) === item)?._id || '');
                               setSlotId('');
                             }}
                             className={`booking-select-card text-left transition ${department === item ? 'active' : ''}`}

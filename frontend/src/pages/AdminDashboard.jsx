@@ -14,6 +14,7 @@ import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundReque
 import StatusBadge from '../components/StatusBadge.jsx';
 import { MIN_CONSULTATION_FEE, normalizeFee } from '../utils/paymentRules.js';
 import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl } from '../utils/validation.js';
+import { normalizeDoctor, normalizeDoctors } from '../utils/doctorUtils.js';
 
 const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const palette = ['#147bd1', '#10b981', '#f59e0b', '#e05283'];
@@ -125,7 +126,7 @@ export default function AdminDashboard() {
         ]);
         if (cancelled) return;
         setBookings(Array.isArray(appointmentsData) ? appointmentsData : []);
-        setDoctorList(Array.isArray(doctorsData) ? doctorsData : []);
+        setDoctorList(normalizeDoctors(doctorsData));
         setRefunds(Array.isArray(refundsData) ? refundsData : []);
         
         const stats = buildOverviewFromBookings(
@@ -230,7 +231,7 @@ export default function AdminDashboard() {
 
   const persistDoctor = async (doctor) => {
     try {
-      const updated = await updateDoctorApi(doctor._id, doctor);
+      const updated = normalizeDoctor(await updateDoctorApi(doctor._id, doctor));
       setDoctorList(prev => prev.map(d => d._id === doctor._id ? updated : d));
       toast.success('Doctor updated');
     } catch (error) {
@@ -241,14 +242,20 @@ export default function AdminDashboard() {
   };
 
   const updateDoctorField = async (doctorId, field, value) => {
-    const nextDoctors = doctorList.map((doctor) =>
-      doctor._id === doctorId
-        ? {
-            ...doctor,
-            [field]: field === 'fee' ? normalizeFee(value) : value
-          }
-        : doctor
-    );
+    const nextDoctors = doctorList.map((doctor) => {
+      if (doctor._id !== doctorId) return doctor;
+      const nextValue = field === 'fee' ? normalizeFee(value) : value;
+      const nextDoctor = { ...doctor, [field]: nextValue };
+      if (field === 'department') {
+        nextDoctor.specialty = nextValue;
+        nextDoctor.specialization = nextValue;
+      }
+      if (field === 'specialty') {
+        nextDoctor.specialization = nextValue;
+        if (DEPARTMENTS.includes(nextValue)) nextDoctor.department = nextValue;
+      }
+      return nextDoctor;
+    });
     setDoctorList(nextDoctors);
     await persistDoctor(nextDoctors.find((doctor) => doctor._id === doctorId));
   };
@@ -285,7 +292,7 @@ export default function AdminDashboard() {
       toast.error('Failed to update slot');
       // Reload to sync with server
       const freshDoctors = await fetchDoctors();
-      setDoctorList(freshDoctors);
+        setDoctorList(normalizeDoctors(freshDoctors));
     }
   };
 
@@ -365,11 +372,11 @@ export default function AdminDashboard() {
         toast.success('✅ 3 doctors seeded to database!');
         // Refresh doctors list
         const freshDoctors = await fetchDoctors();
-        setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+        setDoctorList(normalizeDoctors(freshDoctors));
       } else {
         toast.success('Doctors seeding completed: ' + response.data?.message);
         const freshDoctors = await fetchDoctors();
-        setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+        setDoctorList(normalizeDoctors(freshDoctors));
       }
     } catch (error) {
       console.error('Seed error:', error);
@@ -383,15 +390,6 @@ export default function AdminDashboard() {
     if (error) return toast.error(error);
     
     try {
-      // Check if user has JWT token (email/password login)
-      const token = sessionStorage.getItem('jk_doctor_token');
-      if (!token) {
-        toast.error('Authentication required. Please login with email/password from staff login.');
-        return;
-      }
-      
-      console.log('Creating doctor with token:', token?.substring(0, 20) + '...');
-      
       const doctor = await createDoctorApi({
         name: doctorForm.name.trim(),
         specialty: doctorForm.specialty.trim(),
@@ -412,11 +410,11 @@ export default function AdminDashboard() {
       
       // Refresh doctors list
       const freshDoctors = await fetchDoctors();
-      setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+      setDoctorList(normalizeDoctors(freshDoctors));
       
       setDoctorFormOpen(false);
       setDoctorForm(defaultDoctorForm);
-      toast.success(`Dr. ${doctor.name} added successfully!\nEmail: ${doctor.email}\nPassword: [as set]`);
+      toast.success(`${doctorForm.name.trim()} added. Use the email/password you set in staff login.`);
     } catch (error) {
       console.error('Full error creating doctor:', error);
       const errorMsg = error.response?.data?.message || error.message || 'Failed to add doctor';
@@ -483,7 +481,7 @@ export default function AdminDashboard() {
       
       // Refresh doctors list
       const freshDoctors = await fetchDoctors();
-      setDoctorList(Array.isArray(freshDoctors) ? freshDoctors : []);
+      setDoctorList(normalizeDoctors(freshDoctors));
       
       setSlotFormOpen(false);
       setSlotForm(defaultSlotForm);

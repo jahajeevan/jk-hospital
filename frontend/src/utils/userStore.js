@@ -8,18 +8,20 @@ export const authenticateUser = async (email, password) => {
   return { email, authenticated: true };
 };
 
-// Session is managed by Clerk context, no localStorage needed
 export const createUserSession = (user) => {
-  console.log('User session managed by Clerk:', user);
+  sessionStorage.setItem('jk_doctor_user', JSON.stringify(user));
   return user;
 };
 
 export const readUserSession = () => {
-  // Session is managed by AuthContext + Clerk
-  return null;
+  try {
+    return JSON.parse(sessionStorage.getItem('jk_doctor_user') || 'null');
+  } catch {
+    return null;
+  }
 };
 
 export const clearUserSession = () => {
-  // Session cleared by Clerk signOut
-  console.log('User session cleared by Clerk');
+  sessionStorage.removeItem('jk_doctor_token');
+  sessionStorage.removeItem('jk_doctor_user');
 };

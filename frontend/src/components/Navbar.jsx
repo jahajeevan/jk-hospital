@@ -22,10 +22,13 @@ export default function Navbar() {
     if (doctorUser) {
       sessionStorage.removeItem('jk_doctor_token');
       sessionStorage.removeItem('jk_doctor_user');
+      window.dispatchEvent(new Event('jk-auth-sync'));
       navigate('/');
       setOpen(false);
     } else {
-      handleLogout();
+      void logout();
+      navigate('/');
+      setOpen(false);
     }
   };
   const liquidNavLabels = new Set(['Home', 'Patient', 'Book', 'Reception', 'Doctor', 'Pharmacy', 'Staff', 'AI', 'Doctors', 'Services', 'Contact', 'Admin']);
@@ -180,9 +183,6 @@ export default function Navbar() {
                   <Link to="/login" className="btn-secondary nav-direct-auth px-3 py-2">
                     Login
                   </Link>
-                  <Link to="/doctor/login" className="btn-ghost-light nav-direct-auth px-3 py-2 text-xs">
-                    Doctor Login
-                  </Link>
                 </div>
                 <Link to="/signup" className="btn-primary nav-direct-auth whitespace-nowrap px-3 py-2">
                   Sign up
@@ -250,8 +250,7 @@ export default function Navbar() {
                   </button>
                 ) : (
                   <>
-                    <Link to="/login" className="mobile-nav-action secondary" onClick={() => setOpen(false)}>Patient Login</Link>
-                    <Link to="/doctor/login" className="mobile-nav-action secondary" onClick={() => setOpen(false)}>Doctor Login</Link>
+                    <Link to="/login" className="mobile-nav-action secondary" onClick={() => setOpen(false)}>Login</Link>
                     <Link to="/signup" className="mobile-nav-action primary" onClick={() => setOpen(false)}>Sign up</Link>
                   </>
                 )}

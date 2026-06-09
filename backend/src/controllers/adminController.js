@@ -20,6 +20,35 @@ const doctorDbInput = (input = {}) => pickDefined({
   unavailableDates: input.unavailableDates
 });
 
+const extendedDoctorDbInput = (input = {}) => pickDefined({
+  ...doctorDbInput(input),
+  department: input.department || input.specialty || input.specialization,
+  specialization: input.specialization || input.specialty || input.department,
+  qualification: input.qualification,
+  experience: input.experience
+});
+
+const isMissingColumnError = (error) => {
+  const message = `${error?.message || ''} ${error?.details || ''}`;
+  return error?.code === '42703' || error?.code === 'PGRST204' || /column .* does not exist/i.test(message);
+};
+
+const writeDoctor = async ({ id, body, insert = false }) => {
+  const write = async (payload) => {
+    const query = insert
+      ? supabase.from('doctors').insert(toSnakeObj(payload))
+      : supabase.from('doctors').update(toSnakeObj(payload)).eq('id', id);
+    return query.select('*');
+  };
+
+  const extended = extendedDoctorDbInput(body);
+  let result = await write(extended);
+  if (result.error && isMissingColumnError(result.error)) {
+    result = await write(doctorDbInput(body));
+  }
+  return result;
+};
+
 const slotDbInput = (input = {}, doctorId) => pickDefined({
   doctorId,
   label: input.label,
@@ -119,19 +148,12 @@ export const upsertDoctor = asyncHandler(async (req, res) => {
   let doctor;
   if (req.params.id) {
     // UPDATE existing doctor
-    const { data: docList, error: docErr } = await supabase
-      .from('doctors')
-      .update(toSnakeObj(bodyCopy))
-      .eq('id', req.params.id)
-      .select('*');
+    const { data: docList, error: docErr } = await writeDoctor({ id: req.params.id, body: req.body });
     if (docErr) throw docErr;
     doctor = toCamelObj(docList?.[0]);
   } else {
     // CREATE new doctor + user account
-    const { data: docList, error: docErr } = await supabase
-      .from('doctors')
-      .insert(toSnakeObj(bodyCopy))
-      .select('*');
+    const { data: docList, error: docErr } = await writeDoctor({ body: req.body, insert: true });
     if (docErr) throw docErr;
     doctor = toCamelObj(docList?.[0]);
 

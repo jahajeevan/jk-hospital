@@ -19,22 +19,29 @@ export const DEPARTMENTS = [
 export const getWalkInSlotOptions = (doctor, date) => {
   if (!doctor || !doctor.slots) return [];
   
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localIsoDate();
   const isToday = date === todayStr;
   
-  return doctor.slots.filter(slot => {
-    // Filter slots by date if not today
-    if (!isToday && slot.date && slot.date !== date) return false;
-    
-    // Filter by availability
-    if (!slot.isActive) return false;
-    
-    // Check token availability
-    const availableTokens = (slot.tokenLimit || 0) - (slot.bookedTokens || 0);
-    const availableWalkIn = (slot.walkInTokenLimit || 0) - (slot.walkInBookedTokens || 0);
-    
-    return availableTokens > 0 || availableWalkIn > 0;
-  });
+  return doctor.slots
+    .filter(slot => {
+      if (!isToday && slot.date && datePart(slot.date) !== date) return false;
+      return slot.isActive !== false;
+    })
+    .map((slot) => {
+      const onlineInfo = getSlotAvailability(doctor, slot._id || slot.id, date);
+      const walkInLimit = Number(slot.walkInTokenLimit ?? 50);
+      const booked = Number(slot.walkInBookedTokens || 0);
+      const remaining = Math.max(walkInLimit - booked, 0);
+      const reasons = [...(onlineInfo.reasons || [])];
+      if (remaining <= 0) reasons.push('Walk-in tokens full');
+      return {
+        slot,
+        remaining,
+        booked,
+        isBookable: reasons.length === 0,
+        reasons
+      };
+    });
 };
 
 // Mark patient as arrived (placeholder)
@@ -98,11 +105,69 @@ export const getInventoryAlerts = () => {
   return [];
 };
 
-// Placeholder for additional utilities
-export const getSlotAvailability = () => ({
-  isBookable: true,
-  isFull: false,
-  remaining: 999,
-  estimatedWaitMinutes: 0,
-  reasons: []
-});
+const localIsoDate = (value = new Date()) => {
+  const date = new Date(value);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 10);
+};
+
+const parseDateOnly = (value) => {
+  const [year, month, day] = String(value || localIsoDate()).slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const parseSlotStart = (date, time = '00:00') => {
+  const slotStart = parseDateOnly(date);
+  const [hours = 0, minutes = 0] = String(time || '00:00').split(':').map(Number);
+  slotStart.setHours(hours, minutes, 0, 0);
+  return slotStart;
+};
+
+const datePart = (value) => String(value || '').slice(0, 10);
+
+export const getSlotAvailability = (doctor, slotId, date, now = new Date()) => {
+  const slot = (doctor?.slots || []).find((item) => String(item._id || item.id) === String(slotId));
+  if (!slot) {
+    return {
+      slot: null,
+      isBookable: false,
+      isFull: true,
+      booked: 0,
+      remaining: 0,
+      estimatedWaitMinutes: 0,
+      reasons: ['Select an available OP slot']
+    };
+  }
+
+  const selectedDate = datePart(date || localIsoDate(now));
+  const today = localIsoDate(now);
+  const tokenLimit = Number(slot.tokenLimit || 0);
+  const booked = Number(slot.bookedTokens || 0);
+  const remaining = Math.max(tokenLimit - booked, 0);
+  const advanceBookingMinutes = Number(slot.advanceBookingMinutes ?? 60);
+  const slotStart = parseSlotStart(selectedDate, slot.startTime);
+  const latestSameDayBookingAt = new Date(slotStart.getTime() - advanceBookingMinutes * 60 * 1000);
+  const reasons = [];
+
+  if (doctor?.isAvailable === false) reasons.push('Selected doctor is currently on leave');
+  if (slot.isActive === false) reasons.push('This OP slot is inactive');
+  if (slot.date && datePart(slot.date) !== selectedDate) reasons.push('This slot is not active for the selected date');
+  if (selectedDate < today) reasons.push('Appointment date cannot be in the past');
+  if (slot.availableFrom && selectedDate < datePart(slot.availableFrom)) reasons.push('This slot is not available yet');
+  if (slot.availableUntil && selectedDate > datePart(slot.availableUntil)) reasons.push('This slot is not available for the selected future date');
+  if (selectedDate === today && now > latestSameDayBookingAt) {
+    reasons.push(`Same-day tokens must be booked at least ${advanceBookingMinutes} minutes before the slot starts. Please choose another slot or book the next available date.`);
+  }
+  if (remaining <= 0) reasons.push('Selected slot is full');
+
+  return {
+    slot,
+    isBookable: reasons.length === 0,
+    isFull: remaining <= 0,
+    booked,
+    remaining,
+    estimatedWaitMinutes: Math.max(booked, 0) * 8,
+    reasons,
+    latestSameDayBookingAt
+  };
+};

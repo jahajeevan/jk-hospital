@@ -49,6 +49,39 @@ const FALLBACK_DOCTORS = [
   }
 ];
 
+const specialtyDepartmentMap = {
+  cardiologist: 'Cardiology',
+  cardiology: 'Cardiology',
+  dermatologist: 'Dermatology',
+  dermatology: 'Dermatology',
+  ent: 'ENT',
+  pediatrician: 'Pediatrics',
+  pediatrics: 'Pediatrics',
+  orthopedics: 'Orthopedics',
+  gynecology: 'Gynecology',
+  psychiatry: 'Psychiatry',
+  neurologist: 'General Medicine',
+  neurology: 'General Medicine',
+  'general medicine': 'General Medicine'
+};
+
+const departmentFromDoctor = (doctor = {}) => {
+  const specialty = String(doctor.specialty || '').trim();
+  const department = String(doctor.department || '').trim();
+  return specialtyDepartmentMap[specialty.toLowerCase()] || department || specialty || 'General Medicine';
+};
+
+const presentDoctor = (doctor) => {
+  if (!doctor) return null;
+  return {
+    ...doctor,
+    department: departmentFromDoctor(doctor),
+    specialization: doctor.specialization || doctor.specialty || departmentFromDoctor(doctor),
+    qualification: doctor.qualification || 'MBBS, MD',
+    experience: doctor.experience || ''
+  };
+};
+
 export const listDoctors = asyncHandler(async (_req, res) => {
   try {
     const { data: doctorsData, error } = await supabase
@@ -62,7 +95,7 @@ export const listDoctors = asyncHandler(async (_req, res) => {
       return res.json({ doctors: FALLBACK_DOCTORS });
     }
 
-    const doctors = toCamelObj(doctorsData) || [];
+    const doctors = (toCamelObj(doctorsData) || []).map(presentDoctor);
     res.json({ doctors });
   } catch (err) {
     // If Supabase fails, return fallback doctors
@@ -78,7 +111,7 @@ export const getDoctor = asyncHandler(async (req, res) => {
     .is('deleted_at', null)
     .limit(1);
 
-  const doctor = toCamelObj(doctorData?.[0]);
+  const doctor = presentDoctor(toCamelObj(doctorData?.[0]));
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;
@@ -95,7 +128,7 @@ export const doctorAvailability = asyncHandler(async (req, res) => {
     .is('deleted_at', null)
     .limit(1);
 
-  const doctor = toCamelObj(doctorData?.[0]);
+  const doctor = presentDoctor(toCamelObj(doctorData?.[0]));
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;

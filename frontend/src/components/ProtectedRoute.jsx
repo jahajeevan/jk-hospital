@@ -44,12 +44,14 @@ export default function ProtectedRoute({ children, admin = false, roles = [], al
   
   if (!currentUser) {
     if (admin) return <Navigate to="/admin/login" replace />;
-    if (roles.includes('doctor')) return <Navigate to="/doctor/login" replace />;
+    if (roles.some((role) => ['admin', 'doctor', 'receptionist', 'pharmacist', 'staff'].includes(role))) {
+      return <Navigate to="/admin/login" replace />;
+    }
     return <Navigate to="/login" replace />;
   }
 
   if (admin) {
-    if (!isAdmin) return <AdminAccessDenied />;
+    if (!isAdmin && currentUser.role !== 'admin') return <AdminAccessDenied />;
     return children;
   }
 

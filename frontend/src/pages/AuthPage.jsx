@@ -114,10 +114,13 @@ export default function AuthPage({ mode }) {
         
         // Create user session with role info
         const account = {
+          id: response.data.user?.id,
           email: response.data.user?.email,
           name: response.data.user?.name,
-          role: response.data.user?.role
+          role: response.data.user?.role,
+          isVerified: response.data.user?.isVerified
         };
+        sessionStorage.setItem('jk_doctor_user', JSON.stringify(account));
         await createUserSession(account);
         window.dispatchEvent(new Event('jk-auth-sync'));
         

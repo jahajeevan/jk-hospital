@@ -5,19 +5,20 @@
  */
 
 import api from '../api/client.js';
+import { normalizeDoctor, normalizeDoctors } from '../utils/doctorUtils.js';
 
 // ============ DOCTORS ============
 export const fetchDoctors = async () => {
   try {
     const response = await api.get('/doctors');
-    const doctors = response.data?.doctors || [];
+    const doctors = normalizeDoctors(response.data?.doctors || []);
     console.log('Fetched doctors:', doctors.length > 0 ? `${doctors.length} doctors` : 'Empty list, using fallback');
     return doctors;
   } catch (error) {
     console.error('Error fetching doctors, returning fallback:', error.message);
     // Return fallback doctors when API fails
     // These match what the backend returns as fallback
-    return [
+    return normalizeDoctors([
       {
         id: 'doc-viji-001',
         name: 'Dr. Viji',
@@ -60,14 +61,14 @@ export const fetchDoctors = async () => {
         email: 'sugu@jkhospital.com',
         phone: '9876543212'
       }
-    ];
+    ]);
   }
 };
 
 export const fetchDoctor = async (id) => {
   try {
     const response = await api.get(`/doctors/${id}`);
-    return response.data;
+    return response.data?.doctor ? { doctor: normalizeDoctor(response.data.doctor) } : normalizeDoctor(response.data);
   } catch (error) {
     console.error(`Error fetching doctor ${id}:`, error);
     throw error;
@@ -91,7 +92,7 @@ export const createDoctor = async (doctorData) => {
     console.log('Creating doctor with API data:', { ...doctorData, password: '[redacted]' });
     const response = await api.post('/admin/doctors', doctorData);
     console.log('Doctor created successfully:', response.data);
-    return response.data;
+    return normalizeDoctor(response.data?.doctor || response.data);
   } catch (error) {
     console.error('API Error creating doctor:', {
       status: error.response?.status,
@@ -107,7 +108,7 @@ export const createDoctor = async (doctorData) => {
 export const updateDoctor = async (id, updates) => {
   try {
     const response = await api.put(`/admin/doctors/${id}`, updates);
-    return response.data?.doctor || response.data;
+    return normalizeDoctor(response.data?.doctor || response.data);
   } catch (error) {
     console.error(`Error updating doctor ${id}:`, error);
     throw error;
@@ -137,7 +138,7 @@ export const createDoctorSlot = async (doctorId, slotData) => {
 export const deleteDoctor = async (doctorId) => {
   try {
     const response = await api.delete(`/admin/doctors/${doctorId}`);
-    return response.data;
+    return response.data?.doctor ? { doctor: normalizeDoctor(response.data.doctor) } : response.data;
   } catch (error) {
     console.error(`Error deleting doctor ${doctorId}:`, error);
     throw error;

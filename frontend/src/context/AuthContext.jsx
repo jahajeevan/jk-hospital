@@ -23,6 +23,13 @@ export function AuthProvider({ children }) {
   const { signOut } = useClerk();
   const [booting, setBooting] = useState(true);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
+  const [localSessionUser, setLocalSessionUser] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('jk_doctor_user') || 'null');
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     const boot = async () => {
@@ -36,6 +43,22 @@ export function AuthProvider({ children }) {
     const timer = window.setTimeout(() => setClerkTimedOut(true), 3500);
     return () => window.clearTimeout(timer);
   }, [isLoaded]);
+
+  useEffect(() => {
+    const syncLocalSession = () => {
+      try {
+        setLocalSessionUser(JSON.parse(sessionStorage.getItem('jk_doctor_user') || 'null'));
+      } catch {
+        setLocalSessionUser(null);
+      }
+    };
+    window.addEventListener('jk-auth-sync', syncLocalSession);
+    window.addEventListener('storage', syncLocalSession);
+    return () => {
+      window.removeEventListener('jk-auth-sync', syncLocalSession);
+      window.removeEventListener('storage', syncLocalSession);
+    };
+  }, []);
 
   const email = clerkUser?.primaryEmailAddress?.emailAddress || clerkUser?.emailAddresses?.[0]?.emailAddress || '';
   const normalizedEmail = email.toLowerCase();
@@ -58,10 +81,14 @@ export function AuthProvider({ children }) {
       }
     : null;
 
-  const user = clerkSessionUser;
+  const user = localSessionUser || clerkSessionUser;
   const needsProfileCompletion = Boolean(clerkSessionUser?.needsProfileCompletion);
 
   const logout = async () => {
+    sessionStorage.removeItem('jk_doctor_token');
+    sessionStorage.removeItem('jk_doctor_user');
+    setLocalSessionUser(null);
+    window.dispatchEvent(new Event('jk-auth-sync'));
     if (isSignedIn) await signOut();
     toast.success('Logged out securely');
   };
