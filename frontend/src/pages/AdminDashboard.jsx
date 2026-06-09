@@ -10,7 +10,7 @@ import MetricCard from '../components/MetricCard.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
 import { DEPARTMENTS } from '../utils/localStore.js';
-import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor, updateDoctorSlot, createDoctor as createDoctorApi, updateAppointment, deleteDoctor as deleteDoctorApi, deleteSlot as deleteSlotApi } from '../services/apiService.js';
+import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor as updateDoctorApi, updateDoctorSlot, createDoctor as createDoctorApi, updateAppointment, deleteDoctor as deleteDoctorApi, deleteSlot as deleteSlotApi } from '../services/apiService.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { MIN_CONSULTATION_FEE, normalizeFee } from '../utils/paymentRules.js';
 import { isNonNegativeInteger, isPositiveInteger, isTimeBefore, isValidHttpUrl } from '../utils/validation.js';
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
 
   const persistDoctor = async (doctor) => {
     try {
-      const updated = await updateDoctor(doctor._id, doctor);
+      const updated = await updateDoctorApi(doctor._id, doctor);
       setDoctorList(prev => prev.map(d => d._id === doctor._id ? updated : d));
       toast.success('Doctor updated');
     } catch (error) {
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const updateDoctor = async (doctorId, field, value) => {
+  const updateDoctorField = async (doctorId, field, value) => {
     const nextDoctors = doctorList.map((doctor) =>
       doctor._id === doctorId
         ? {
@@ -489,7 +489,7 @@ export default function AdminDashboard() {
       };
       
       // Update on server
-      await updateDoctor(doctorId, updatedDoctor);
+      await updateDoctorApi(doctorId, updatedDoctor);
       
       // Refresh doctors list
       const freshDoctors = await fetchDoctors();
@@ -687,44 +687,44 @@ export default function AdminDashboard() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="text-xs font-bold text-slate-500">
                       <span className="mb-1 flex items-center gap-1"><Stethoscope size={14} /> Doctor name</span>
-                      <input className="field px-3 py-2" value={doctor.name} onChange={(event) => updateDoctor(doctor._id, 'name', event.target.value)} />
+                      <input className="field px-3 py-2" value={doctor.name} onChange={(event) => updateDoctorField(doctor._id, 'name', event.target.value)} />
                     </label>
                     <label className="text-xs font-bold text-slate-500">
                       Specialist in
-                      <input className="field mt-1 px-3 py-2" value={doctor.specialty} onChange={(event) => updateDoctor(doctor._id, 'specialty', event.target.value)} />
+                      <input className="field mt-1 px-3 py-2" value={doctor.specialty} onChange={(event) => updateDoctorField(doctor._id, 'specialty', event.target.value)} />
                     </label>
                     <label className="text-xs font-bold text-slate-500">
                       Department
-                      <select className="field mt-1 px-3 py-2" value={doctor.department || 'General Medicine'} onChange={(event) => updateDoctor(doctor._id, 'department', event.target.value)}>
+                      <select className="field mt-1 px-3 py-2" value={doctor.department || 'General Medicine'} onChange={(event) => updateDoctorField(doctor._id, 'department', event.target.value)}>
                         {DEPARTMENTS.map((item) => <option key={item}>{item}</option>)}
                       </select>
                     </label>
                     <label className="text-xs font-bold text-slate-500">
                       Qualification
-                      <input className="field mt-1 px-3 py-2" value={doctor.qualification || ''} onChange={(event) => updateDoctor(doctor._id, 'qualification', event.target.value)} />
+                      <input className="field mt-1 px-3 py-2" value={doctor.qualification || ''} onChange={(event) => updateDoctorField(doctor._id, 'qualification', event.target.value)} />
                     </label>
                     <label className="text-xs font-bold text-slate-500">
                       Experience
-                      <input className="field mt-1 px-3 py-2" value={doctor.experience || ''} onChange={(event) => updateDoctor(doctor._id, 'experience', event.target.value)} />
+                      <input className="field mt-1 px-3 py-2" value={doctor.experience || ''} onChange={(event) => updateDoctorField(doctor._id, 'experience', event.target.value)} />
                     </label>
                     <label className="text-xs font-bold text-slate-500 sm:col-span-2">
                       <span className="mb-1 flex items-center gap-1"><Image size={14} /> Image URL</span>
-                      <input className="field px-3 py-2" value={doctor.avatar} onChange={(event) => updateDoctor(doctor._id, 'avatar', event.target.value)} />
+                      <input className="field px-3 py-2" value={doctor.avatar} onChange={(event) => updateDoctorField(doctor._id, 'avatar', event.target.value)} />
                     </label>
                     <label className="text-xs font-bold text-slate-500">
                       Base consultant fee
-                      <input className="field mt-1 px-3 py-2" type="number" min={MIN_CONSULTATION_FEE} value={doctor.fee} onChange={(event) => updateDoctor(doctor._id, 'fee', event.target.value)} />
+                      <input className="field mt-1 px-3 py-2" type="number" min={MIN_CONSULTATION_FEE} value={doctor.fee} onChange={(event) => updateDoctorField(doctor._id, 'fee', event.target.value)} />
                     </label>
                     <label className="text-xs font-bold text-slate-500">
                       Availability
-                      <select className="field mt-1 px-3 py-2" value={doctor.isAvailable ? 'yes' : 'no'} onChange={(event) => updateDoctor(doctor._id, 'isAvailable', event.target.value === 'yes')}>
+                      <select className="field mt-1 px-3 py-2" value={doctor.isAvailable ? 'yes' : 'no'} onChange={(event) => updateDoctorField(doctor._id, 'isAvailable', event.target.value === 'yes')}>
                         <option value="yes">Available</option>
                         <option value="no">On leave</option>
                       </select>
                     </label>
                     <label className="text-xs font-bold text-slate-500 sm:col-span-2">
                       Profile
-                      <textarea className="field mt-1 min-h-20 px-3 py-2" value={doctor.bio} onChange={(event) => updateDoctor(doctor._id, 'bio', event.target.value)} />
+                      <textarea className="field mt-1 min-h-20 px-3 py-2" value={doctor.bio} onChange={(event) => updateDoctorField(doctor._id, 'bio', event.target.value)} />
                     </label>
                   </div>
                 </div>
