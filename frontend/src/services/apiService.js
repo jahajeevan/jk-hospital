@@ -205,14 +205,8 @@ export const deleteAppointment = async (id) => {
   }
 };
 
-export const fetchRefundRequests = async (filters = {}) => {
-  try {
-    const response = await api.get('/refunds', { params: filters });
-    return response.data || [];
-  } catch (error) {
-    console.error('Error fetching refund requests:', error);
-    throw error;
-  }
+export const fetchRefundRequests = async () => {
+  return [];
 };
 
 export const updateRefundRequest = async (id, updates) => {
