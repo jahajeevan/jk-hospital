@@ -11,6 +11,46 @@ const getSlotFee = (doctor, slotId) => {
   return slot?.fee ?? doctor.fee ?? HOSPITAL.consultationFee;
 };
 
+const normalizeComparable = (value) => String(value || '').trim().toLowerCase();
+
+const resolveDoctor = async ({ doctorId, doctorEmail, doctorName }) => {
+  const queryDoctor = async (applyFilters) => {
+    const { data } = await applyFilters(
+      supabase
+        .from('doctors')
+        .select('*, slots:doctor_slots(*)')
+        .is('deleted_at', null)
+    )
+      .limit(1);
+    return toCamelObj(data?.[0]);
+  };
+
+  let doctor = null;
+  if (doctorId) {
+    doctor = await queryDoctor((query) => query.eq('id', doctorId));
+  }
+  if (!doctor && doctorEmail) {
+    doctor = await queryDoctor((query) => query.ilike('email', normalizeComparable(doctorEmail)));
+  }
+  if (!doctor && doctorName) {
+    doctor = await queryDoctor((query) => query.ilike('name', doctorName));
+  }
+
+  return doctor;
+};
+
+const resolveSlotId = (doctor, slotId, slotLabel) => {
+  const slots = doctor?.slots || [];
+  const slotById = slots.find((slot) => String(slot._id || slot.id) === String(slotId));
+  if (slotById) return String(slotById._id || slotById.id);
+
+  const normalizedLabel = normalizeComparable(slotLabel);
+  const slotByLabel = slots.find((slot) => normalizeComparable(slot.label) === normalizedLabel);
+  if (slotByLabel) return String(slotByLabel._id || slotByLabel.id);
+
+  return slotId;
+};
+
 const withPaymentFallback = (appointment, payment) => ({
   ...(appointment || {}),
   payment: appointment?.payment || payment
@@ -57,20 +97,15 @@ const createSuccessfulPayment = async ({ user, doctor, slotId, paymentInput = {}
   return toCamelObj(newPayments?.[0]);
 };
 
-export const createConfirmedAppointment = async ({ user, doctorId, slotId, appointmentDate, patientDetails, payment, paymentInput }) => {
-  const { data: doctors } = await supabase
-    .from('doctors')
-    .select('*, slots:doctor_slots(*)')
-    .eq('id', doctorId)
-    .is('deleted_at', null)
-    .limit(1);
-
-  const doctor = toCamelObj(doctors?.[0]);
+export const createConfirmedAppointment = async ({ user, doctorId, doctorEmail, doctorName, slotId, slotLabel, appointmentDate, patientDetails, payment, paymentInput }) => {
+  const doctor = await resolveDoctor({ doctorId, doctorEmail, doctorName });
   if (!doctor) {
     const error = new Error('Doctor not found');
     error.statusCode = 404;
     throw error;
   }
+
+  const resolvedSlotId = resolveSlotId(doctor, slotId, slotLabel);
 
   const normalizedAppointmentDate = normalizeAppointmentDate(appointmentDate);
 
@@ -94,7 +129,7 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     .eq('patient_id', user._id)
     .eq('doctor_id', doctor._id)
     .eq('appointment_date', normalizedAppointmentDate.toISOString().slice(0, 10))
-    .eq('slot_id', slotId)
+    .eq('slot_id', resolvedSlotId)
     .not('status', 'in', '("cancelled","rejected")')
     .is('deleted_at', null)
     .limit(1);
@@ -109,7 +144,7 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     const duplicatePayment = await createSuccessfulPayment({
       user,
       doctor,
-      slotId,
+      slotId: resolvedSlotId,
       paymentInput,
       appointmentId: duplicate._id
     });
@@ -125,11 +160,11 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     };
   }
 
-  const token = await allocateToken(doctor, normalizedAppointmentDate, slotId);
+  const token = await allocateToken(doctor, normalizedAppointmentDate, resolvedSlotId);
   
   let paid = payment;
   if (!paid) {
-    paid = await createSuccessfulPayment({ user, doctor, slotId, paymentInput });
+    paid = await createSuccessfulPayment({ user, doctor, slotId: resolvedSlotId, paymentInput });
   }
 
   const { data: newAppointments, error: appointmentError } = await supabase
@@ -138,7 +173,7 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
       patientId: user._id,
       doctorId: doctor._id,
       appointmentDate: normalizedAppointmentDate.toISOString().slice(0, 10),
-      slotId,
+      slotId: resolvedSlotId,
       slotLabel: token.slot.label,
       tokenNumber: token.tokenNumber,
       queuePosition: token.queuePosition,

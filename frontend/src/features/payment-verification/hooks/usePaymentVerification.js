@@ -5,8 +5,6 @@
 import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { createAppointment } from '../../../services/apiService.js';
-import api from '../../../api/client.js';
-import { usePaymentAudio } from './usePaymentAudio.js';
 import {
   confirmStripeSession,
   getVerificationErrorMessage,
@@ -16,10 +14,17 @@ import { triggerElectronHaptic } from '../utils/haptics.js';
 
 /** @typedef {'idle' | 'processing' | 'success' | 'failure'} VerificationStatus */
 
+const silentAudio = {
+  prepareAudio: async () => {},
+  playProcessing: async () => {},
+  playSuccess: async () => {},
+  playFailure: async () => {},
+  stopAll: () => {}
+};
+
 /**
  * @typedef {Object} UsePaymentVerificationOptions
  * @property {boolean} [enableHaptics]
- * @property {number} [volume]
  * @property {boolean} [showToast] — surface errors via toast (default false)
  */
 
@@ -27,8 +32,8 @@ import { triggerElectronHaptic } from '../utils/haptics.js';
  * @param {UsePaymentVerificationOptions} [options]
  */
 export function usePaymentVerification(options = {}) {
-  const { enableHaptics = true, volume = 0.85, showToast = false } = options;
-  const audio = usePaymentAudio({ initialVolume: volume });
+  const { enableHaptics = true, showToast = false } = options;
+  const audio = silentAudio;
   const [status, setStatus] = useState(/** @type {VerificationStatus} */ ('idle'));
   const [errorMessage, setErrorMessage] = useState('');
   const [lastPayment, setLastPayment] = useState(null);
@@ -51,8 +56,6 @@ export function usePaymentVerification(options = {}) {
       verifyingRef.current = true;
       setStatus('processing');
       setErrorMessage('');
-      await audio.prepareAudio();
-      await audio.playProcessing();
       if (enableHaptics) triggerElectronHaptic('processing');
 
       try {
@@ -66,8 +69,6 @@ export function usePaymentVerification(options = {}) {
         });
         setLastPayment(result.payment);
         setStatus('success');
-        audio.stopAll();
-        await audio.playSuccess();
         if (enableHaptics) triggerElectronHaptic('success');
         if (showToast) toast.success('Payment verified successfully', { icon: '✓' });
         return appointment;
@@ -75,8 +76,6 @@ export function usePaymentVerification(options = {}) {
         const message = getVerificationErrorMessage(error) || 'Payment verification failed';
         setErrorMessage(message);
         setStatus('failure');
-        audio.stopAll();
-        await audio.playFailure();
         if (enableHaptics) triggerElectronHaptic('failure');
         if (showToast) toast.error(message);
         return null;

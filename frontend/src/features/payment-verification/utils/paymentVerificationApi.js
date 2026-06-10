@@ -57,7 +57,10 @@ export const verifyRazorpayPayment = async (razorpayResponse, amount, booking) =
     amount,
     booking: booking ? {
       doctorId: booking.doctor?._id || booking.doctor?.id,
+      doctorEmail: booking.doctor?.email,
+      doctorName: booking.doctor?.name,
       slotId: booking.slot?._id || booking.slot?.id,
+      slotLabel: booking.slot?.label,
       appointmentDate: booking.date,
       patientDetails: booking.patient
     } : undefined
@@ -83,7 +86,10 @@ export const confirmStripeSession = async (sessionId, booking) => {
     sessionId,
     booking: booking ? {
       doctorId: booking.doctor?._id || booking.doctor?.id,
+      doctorEmail: booking.doctor?.email,
+      doctorName: booking.doctor?.name,
       slotId: booking.slot?._id || booking.slot?.id,
+      slotLabel: booking.slot?.label,
       appointmentDate: booking.date,
       patientDetails: booking.patient
     } : undefined

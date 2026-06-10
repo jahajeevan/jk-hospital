@@ -26,6 +26,31 @@ const checklist = [
   'Keep registered phone active for SMS updates'
 ];
 
+const LAST_CONFIRMED_APPOINTMENT_KEY = 'jk_last_confirmed_appointment';
+
+const readLastConfirmedAppointment = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return JSON.parse(sessionStorage.getItem(LAST_CONFIRMED_APPOINTMENT_KEY) || 'null');
+  } catch {
+    return null;
+  }
+};
+
+const mergeConfirmedAppointment = (appointments = [], userEmail = '') => {
+  const list = Array.isArray(appointments) ? appointments : [];
+  const confirmed = readLastConfirmedAppointment();
+  const confirmedId = confirmed?._id || confirmed?.id;
+  if (!confirmedId) return list;
+  const confirmedEmail = confirmed?.patientDetails?.email || confirmed?.patientEmail || confirmed?.user?.email;
+  if (userEmail && confirmedEmail && String(confirmedEmail).toLowerCase() !== String(userEmail).toLowerCase()) {
+    return list;
+  }
+  return list.some((appointment) => String(appointment._id || appointment.id) === String(confirmedId))
+    ? list
+    : [confirmed, ...list];
+};
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [tab, setTab] = useState('overview');
@@ -39,13 +64,13 @@ export default function Dashboard() {
     try {
       setLoading(true);
       const data = await fetchUserAppointments();
-      setAppointments(Array.isArray(data) ? data : []);
+      setAppointments(mergeConfirmedAppointment(Array.isArray(data) ? data : [], user?.email));
       setRecords([]);
       setNotifications([]);
     } catch (error) {
       console.error('Error loading appointments:', error);
       toast.error('Failed to load appointments');
-      setAppointments([]);
+      setAppointments((current) => current.length ? current : mergeConfirmedAppointment([], user?.email));
     } finally {
       setLoading(false);
     }
@@ -55,6 +80,14 @@ export default function Dashboard() {
     if (user?.email) {
       reload();
     }
+  }, [user?.email]);
+
+  useEffect(() => {
+    const syncConfirmedAppointment = () => {
+      setAppointments((current) => mergeConfirmedAppointment(current, user?.email));
+    };
+    window.addEventListener('jk-appointment-confirmed', syncConfirmedAppointment);
+    return () => window.removeEventListener('jk-appointment-confirmed', syncConfirmedAppointment);
   }, [user?.email]);
 
   const active = appointments.find((item) => ['payment_submitted', 'confirmed', 'approved', 'rescheduled', 'arrived', 'in_progress', 'prescription_generated', 'pharmacy_pending', 'paid'].includes(item.status));

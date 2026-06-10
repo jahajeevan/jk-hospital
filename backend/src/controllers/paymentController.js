@@ -172,7 +172,10 @@ export const verifyRazorpayOrder = asyncHandler(async (req, res) => {
     const appointment = await createConfirmedAppointment({
       user: req.user,
       doctorId: booking.doctorId,
+      doctorEmail: booking.doctorEmail,
+      doctorName: booking.doctorName,
       slotId: booking.slotId,
+      slotLabel: booking.slotLabel,
       appointmentDate: booking.appointmentDate,
       patientDetails: booking.patientDetails,
       paymentInput
@@ -338,7 +341,10 @@ export const confirmLocalCheckoutSession = asyncHandler(async (req, res) => {
     const appointment = await createConfirmedAppointment({
       user: req.user,
       doctorId: booking.doctorId,
+      doctorEmail: booking.doctorEmail,
+      doctorName: booking.doctorName,
       slotId: booking.slotId,
+      slotLabel: booking.slotLabel,
       appointmentDate: booking.appointmentDate,
       patientDetails: booking.patientDetails,
       paymentInput

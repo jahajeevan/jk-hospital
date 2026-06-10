@@ -3,9 +3,10 @@ import { Download, LayoutDashboard } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import SuccessConfetti from '../features/payment-verification/components/SuccessConfetti.jsx';
-import { playSuccessSound } from '../features/payment-verification/utils/audioManager.js';
 import { triggerElectronHaptic } from '../features/payment-verification/utils/haptics.js';
 import { downloadInvoice } from '../utils/invoice.js';
+
+const LAST_CONFIRMED_APPOINTMENT_KEY = 'jk_last_confirmed_appointment';
 
 const providerLabel = (method) => {
   if (method === 'stripe') return 'Stripe';
@@ -18,9 +19,15 @@ export default function PaymentSuccessPage() {
   const appointment = state?.appointment;
 
   useEffect(() => {
-    void playSuccessSound();
     triggerElectronHaptic('success');
-  }, []);
+    if (!appointment) return;
+    try {
+      sessionStorage.setItem(LAST_CONFIRMED_APPOINTMENT_KEY, JSON.stringify(appointment));
+      window.dispatchEvent(new Event('jk-appointment-confirmed'));
+    } catch {
+      /* Session persistence is only a dashboard convenience. */
+    }
+  }, [appointment]);
 
   if (!appointment) return <Navigate to="/book" replace />;
 

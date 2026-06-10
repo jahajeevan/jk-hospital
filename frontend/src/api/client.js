@@ -86,14 +86,41 @@ api.interceptors.response.use(
 );
 
 api.interceptors.request.use(async (config) => {
-  // Check for doctor token first (local authentication)
-  const doctorToken = sessionStorage.getItem('jk_doctor_token');
-  if (doctorToken) {
-    config.headers.Authorization = `Bearer ${doctorToken}`;
+  const requestPath = String(config.url || '');
+  const browserPath = typeof window === 'undefined' ? '' : window.location.pathname;
+  const staffToken = sessionStorage.getItem('jk_doctor_token');
+
+  const staffPage =
+    browserPath.startsWith('/admin') ||
+    browserPath.startsWith('/receptionist') ||
+    browserPath.startsWith('/doctor-dashboard') ||
+    browserPath.startsWith('/pharmacist');
+
+  let localSessionUser = null;
+  try {
+    localSessionUser = JSON.parse(sessionStorage.getItem('jk_doctor_user') || 'null');
+  } catch {
+    localSessionUser = null;
+  }
+
+  const staffApi =
+    requestPath.startsWith('/admin') ||
+    requestPath.startsWith('/audit-logs') ||
+    requestPath.startsWith('/pharmacy-inventory') ||
+    requestPath.startsWith('/notifications') ||
+    requestPath.includes('/workflow') ||
+    requestPath.includes('/prescription');
+
+  const doctorAppointmentsApi =
+    requestPath.startsWith('/appointments/mine') &&
+    staffPage &&
+    localSessionUser?.role === 'doctor';
+
+  if (staffToken && localSessionUser?.role && staffPage && (staffApi || doctorAppointmentsApi)) {
+    config.headers.Authorization = `Bearer ${staffToken}`;
     return config;
   }
 
-  // Fall back to Clerk token
   const clerkToken = await window.jkGetClerkToken?.();
   if (clerkToken && !clerkToken.startsWith('local-')) {
     config.headers.Authorization = `Bearer ${clerkToken}`;
