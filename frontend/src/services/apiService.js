@@ -203,7 +203,7 @@ export const fetchAppointments = async () => {
 export const fetchUserAppointments = async () => {
   try {
     const response = await api.get('/appointments/mine');
-    return response.data || [];
+    return response.data?.appointments || response.data || [];
   } catch (error) {
     console.error('Error fetching user appointments:', error);
     throw error;

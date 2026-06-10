@@ -16,6 +16,47 @@ const withPaymentFallback = (appointment, payment) => ({
   payment: appointment?.payment || payment
 });
 
+const getPopulatedAppointment = async (appointmentId, fallbackPayment) => {
+  if (!appointmentId) return null;
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*, doctor:doctors(*), payment:payments(*)')
+    .eq('id', appointmentId)
+    .limit(1);
+
+  if (error) {
+    console.warn('Could not populate appointment:', error.message || error);
+    return null;
+  }
+
+  return withPaymentFallback(toCamelObj(data?.[0]), fallbackPayment);
+};
+
+const createSuccessfulPayment = async ({ user, doctor, slotId, paymentInput = {}, appointmentId }) => {
+  const { data: newPayments, error: paymentError } = await supabase
+    .from('payments')
+    .insert(toSnakeObj({
+      patientId: user._id,
+      appointmentId,
+      amount: paymentInput.amount || getSlotFee(doctor, slotId),
+      method: paymentInput.method || 'upi',
+      upiId: HOSPITAL.upiId,
+      transactionId: paymentInput.transactionId || `JKH-${uuid().slice(0, 12).toUpperCase()}`,
+      status: 'success',
+      currency: paymentInput.currency || 'INR',
+      stripeSessionId: paymentInput.stripeSessionId,
+      stripePaymentIntentId: paymentInput.stripePaymentIntentId,
+      razorpayOrderId: paymentInput.razorpayOrderId,
+      razorpayPaymentId: paymentInput.razorpayPaymentId,
+      razorpayPaymentMethod: paymentInput.razorpayPaymentMethod,
+      paidAt: paymentInput.paidAt || new Date().toISOString()
+    }))
+    .select('*');
+
+  if (paymentError) throw paymentError;
+  return toCamelObj(newPayments?.[0]);
+};
+
 export const createConfirmedAppointment = async ({ user, doctorId, slotId, appointmentDate, patientDetails, payment, paymentInput }) => {
   const { data: doctors } = await supabase
     .from('doctors')
@@ -32,6 +73,20 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
   }
 
   const normalizedAppointmentDate = normalizeAppointmentDate(appointmentDate);
+
+  if (paymentInput?.transactionId) {
+    const { data: existingPayments } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('transaction_id', paymentInput.transactionId)
+      .limit(1);
+
+    const existingPayment = toCamelObj(existingPayments?.[0]);
+    if (existingPayment?.appointmentId) {
+      const existingAppointment = await getPopulatedAppointment(existingPayment.appointmentId, existingPayment);
+      if (existingAppointment) return existingAppointment;
+    }
+  }
   
   const { data: duplicates } = await supabase
     .from('appointments')
@@ -46,36 +101,35 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
 
   const duplicate = toCamelObj(duplicates?.[0]);
   if (duplicate) {
-    const error = new Error('Duplicate booking for this doctor, date, and slot is not allowed');
-    error.statusCode = 409;
-    throw error;
+    const existingAppointment = await getPopulatedAppointment(duplicate._id);
+    if (existingAppointment?.payment || !paymentInput) {
+      return existingAppointment || duplicate;
+    }
+
+    const duplicatePayment = await createSuccessfulPayment({
+      user,
+      doctor,
+      slotId,
+      paymentInput,
+      appointmentId: duplicate._id
+    });
+
+    await supabase
+      .from('appointments')
+      .update({ payment_id: duplicatePayment._id })
+      .eq('id', duplicate._id);
+
+    return await getPopulatedAppointment(duplicate._id, duplicatePayment) || {
+      ...duplicate,
+      payment: duplicatePayment
+    };
   }
 
   const token = await allocateToken(doctor, normalizedAppointmentDate, slotId);
   
   let paid = payment;
   if (!paid) {
-    const { data: newPayments, error: paymentError } = await supabase
-      .from('payments')
-      .insert(toSnakeObj({
-        patientId: user._id,
-        amount: paymentInput?.amount || getSlotFee(doctor, slotId),
-        method: paymentInput?.method || 'upi',
-        upiId: HOSPITAL.upiId,
-        transactionId: paymentInput?.transactionId || `JKH-${uuid().slice(0, 12).toUpperCase()}`,
-        status: 'success',
-        currency: paymentInput?.currency || 'INR',
-        stripeSessionId: paymentInput?.stripeSessionId,
-        stripePaymentIntentId: paymentInput?.stripePaymentIntentId,
-        razorpayOrderId: paymentInput?.razorpayOrderId,
-        razorpayPaymentId: paymentInput?.razorpayPaymentId,
-        razorpayPaymentMethod: paymentInput?.razorpayPaymentMethod,
-        paidAt: paymentInput?.paidAt || new Date().toISOString()
-      }))
-      .select('*');
-
-    if (paymentError) throw paymentError;
-    paid = toCamelObj(newPayments?.[0]);
+    paid = await createSuccessfulPayment({ user, doctor, slotId, paymentInput });
   }
 
   const { data: newAppointments, error: appointmentError } = await supabase
@@ -105,13 +159,7 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     .eq('id', paid._id);
 
   // Fetch populated appointment
-  const { data: populatedData } = await supabase
-    .from('appointments')
-    .select('*, doctor:doctors(*), payment:payments(*)')
-    .eq('id', appointment._id)
-    .limit(1);
-
-  const populated = withPaymentFallback(toCamelObj(populatedData?.[0]) || appointment, paid);
+  const populated = await getPopulatedAppointment(appointment._id, paid) || withPaymentFallback(appointment, paid);
   try {
     const invoiceBuffer = await createInvoiceBuffer(populated, paid);
     await sendAppointmentEmail(user.email, populated);
