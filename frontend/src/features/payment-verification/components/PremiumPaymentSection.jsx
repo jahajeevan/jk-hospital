@@ -258,7 +258,6 @@ export default function PremiumPaymentSection({ booking, user }) {
         open={showModal}
         status={status}
         message={errorMessage}
-        voiceEnabled={false}
       />
 
       <div className="container-pad grid gap-6 lg:grid-cols-[1fr_0.85fr]">

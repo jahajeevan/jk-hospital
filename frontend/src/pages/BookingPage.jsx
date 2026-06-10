@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import AiVisitPrep from '../components/AiVisitPrep.jsx';
 import BookingStepper from '../components/BookingStepper.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { fetchDoctors, fetchDoctorSlots } from '../services/apiService.js';
+import { fetchDoctors, fetchDoctorSlots, getCachedDoctors } from '../services/apiService.js';
 import { DEPARTMENTS, getSlotAvailability } from '../utils/localStore.js';
 import { getDoctorDepartment } from '../utils/doctorUtils.js';
 import { normalizeFee } from '../utils/paymentRules.js';
@@ -37,8 +37,8 @@ export default function BookingPage() {
   const { state } = useLocation();
   const { user } = useAuth();
   const [step, setStep] = useState(0);
-  const [doctors, setDoctors] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [doctors, setDoctors] = useState(() => getCachedDoctors());
+  const [loading, setLoading] = useState(false);
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
   const [doctorId, setDoctorId] = useState('');
   const [date, setDate] = useState(today);
@@ -48,7 +48,7 @@ export default function BookingPage() {
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        setLoading(true);
+        setLoading(!doctors.length);
         const data = await fetchDoctors();
         setDoctors(Array.isArray(data) ? data : []);
         if (state?.doctorId) {
@@ -67,7 +67,7 @@ export default function BookingPage() {
       }
     };
     loadDoctors();
-  }, [state?.doctorId]);
+  }, [state?.doctorId, doctors.length]);
 
   const departmentDoctors = doctors.filter((item) => getDoctorDepartment(item) === department);
   const doctor = departmentDoctors.find((item) => item._id === doctorId) || departmentDoctors[0];

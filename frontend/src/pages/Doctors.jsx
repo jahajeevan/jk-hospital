@@ -3,18 +3,18 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import DoctorCard from '../components/DoctorCard.jsx';
 import Reveal from '../components/Reveal.jsx';
-import { fetchDoctors } from '../services/apiService.js';
+import { fetchDoctors, getCachedDoctors } from '../services/apiService.js';
 
 export default function Doctors() {
-  const [doctors, setDoctors] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [doctors, setDoctors] = useState(() => getCachedDoctors());
+  const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [specialty, setSpecialty] = useState('all');
 
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        setLoading(true);
+        setLoading(!doctors.length);
         const data = await fetchDoctors();
         setDoctors(Array.isArray(data) ? data : []);
       } catch (error) {
@@ -26,7 +26,7 @@ export default function Doctors() {
       }
     };
     loadDoctors();
-  }, []);
+  }, [doctors.length]);
 
   const specialties = useMemo(() => ['all', ...new Set(doctors.map((d) => d.specialty))], [doctors]);
 

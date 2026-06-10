@@ -1,5 +1,10 @@
 import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
 
+const isMissingInventoryTable = (error) => {
+  const text = `${error?.message || ''} ${error?.details || ''}`;
+  return error?.code === '42P01' || /pharmacy_inventory/i.test(text) && /not find|does not exist|schema cache/i.test(text);
+};
+
 const inventoryInput = (data = {}) => ({
   itemName: data.itemName || data.name || 'Medicine',
   quantity: Number(data.quantity ?? data.currentStock ?? 0),
@@ -75,7 +80,10 @@ export const listInventory = async (limit = 100, offset = 0, category = null) =>
 
   const { data: result, error } = await query;
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingInventoryTable(error)) return [];
+    throw error;
+  }
   return (result || []).map(inventoryOutput);
 };
 
@@ -86,7 +94,10 @@ export const getInventoryByCategory = async (category) => {
     .eq('category', category)
     .order('item_name', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingInventoryTable(error)) return [];
+    throw error;
+  }
   return (result || []).map(inventoryOutput);
 };
 
@@ -98,7 +109,10 @@ export const getLowStockItems = async (limit = 50) => {
     .order('quantity', { ascending: true })
     .limit(limit);
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingInventoryTable(error)) return [];
+    throw error;
+  }
   return (result || []).map(inventoryOutput);
 };
 

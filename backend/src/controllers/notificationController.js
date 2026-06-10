@@ -4,6 +4,11 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 const dbNotificationType = (type = 'system') =>
   ['appointment', 'payment', 'refund', 'system'].includes(type) ? type : 'system';
 
+const isMissingNotificationsTable = (error) => {
+  const text = `${error?.message || ''} ${error?.details || ''}`;
+  return error?.code === '42P01' || /notifications/i.test(text) && /not find|does not exist|schema cache/i.test(text);
+};
+
 export const listNotifications = asyncHandler(async (req, res) => {
   let query = supabase
     .from('notifications')
@@ -19,7 +24,10 @@ export const listNotifications = asyncHandler(async (req, res) => {
   }
 
   const { data: notificationsData, error } = await query;
-  if (error) throw error;
+  if (error) {
+    if (isMissingNotificationsTable(error)) return res.json({ notifications: [] });
+    throw error;
+  }
   res.json({ notifications: toCamelObj(notificationsData) || [] });
 });
 
@@ -32,7 +40,10 @@ export const myNotifications = asyncHandler(async (req, res) => {
     .order('created_at', { ascending: false })
     .limit(30);
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingNotificationsTable(error)) return res.json({ notifications: [] });
+    throw error;
+  }
   res.json({ notifications: toCamelObj(notificationsData) || [] });
 });
 

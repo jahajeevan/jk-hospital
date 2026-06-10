@@ -19,7 +19,7 @@ import toast from 'react-hot-toast';
 import DoctorCard from '../components/DoctorCard.jsx';
 import TiltCard from '../components/TiltCard.jsx';
 import { galleryImages, testimonials } from '../data/demoData.js';
-import { fetchDoctors } from '../services/apiService.js';
+import { fetchDoctors, getCachedDoctors } from '../services/apiService.js';
 import { fadeUp, staggerContainer } from '../utils/motion.js';
 
 const steps = [
@@ -63,14 +63,14 @@ const faqs = [
 ];
 
 export default function Home() {
-  const [doctors, setDoctors] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [doctors, setDoctors] = useState(() => getCachedDoctors().slice(0, 3));
+  const [loading, setLoading] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
 
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        setLoading(true);
+        setLoading(!doctors.length);
         const data = await fetchDoctors();
         const doctorList = Array.isArray(data) ? data.slice(0, 3) : [];
         setDoctors(doctorList);
@@ -82,7 +82,7 @@ export default function Home() {
       }
     };
     loadDoctors();
-  }, []);
+  }, [doctors.length]);
 
   return (
     <main className="landing-page">

@@ -10,21 +10,13 @@ import VerificationStatusDisplay from './VerificationStatusDisplay.jsx';
  * @param {{
  *   open: boolean,
  *   status: 'idle' | 'processing' | 'success' | 'failure',
- *   message?: string,
- *   volume?: number,
- *   onVolumeChange?: (v: number) => void,
- *   voiceEnabled?: boolean,
- *   onVoiceToggle?: (v: boolean) => void
+ *   message?: string
  * }} props
  */
 export default function PaymentVerificationModal({
   open,
   status,
-  message = '',
-  volume = 0.85,
-  onVolumeChange,
-  voiceEnabled = false,
-  onVoiceToggle
+  message = ''
 }) {
   const show = open && status !== 'idle';
 
@@ -58,35 +50,6 @@ export default function PaymentVerificationModal({
               {status === 'failure' && 'Something went wrong'}
             </h2>
             <VerificationStatusDisplay status={status} message={message} />
-            {(onVolumeChange || onVoiceToggle) && (
-              <div className="mt-5 space-y-3 rounded-xl border border-slate-200/60 bg-white/50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/40">
-                {onVolumeChange && (
-                  <label className="flex items-center gap-3">
-                    <span className="w-14 shrink-0 text-slate-600 dark:text-slate-400">Volume</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={volume}
-                      onChange={(e) => onVolumeChange(Number(e.target.value))}
-                      className="h-2 flex-1 accent-medical-600"
-                    />
-                  </label>
-                )}
-                {onVoiceToggle && (
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={voiceEnabled}
-                      onChange={(e) => onVoiceToggle(e.target.checked)}
-                      className="rounded border-slate-300 text-medical-600"
-                    />
-                    <span className="text-slate-700 dark:text-slate-300">Voice feedback</span>
-                  </label>
-                )}
-              </div>
-            )}
           </motion.div>
         </motion.div>
       )}

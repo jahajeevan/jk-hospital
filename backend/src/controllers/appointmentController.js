@@ -11,6 +11,11 @@ const getSlotFee = (doctor, slotId) => {
   return slot?.fee ?? doctor.fee ?? HOSPITAL.consultationFee;
 };
 
+const withPaymentFallback = (appointment, payment) => ({
+  ...(appointment || {}),
+  payment: appointment?.payment || payment
+});
+
 export const createConfirmedAppointment = async ({ user, doctorId, slotId, appointmentDate, patientDetails, payment, paymentInput }) => {
   const { data: doctors } = await supabase
     .from('doctors')
@@ -61,7 +66,11 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
         status: 'success',
         currency: paymentInput?.currency || 'INR',
         stripeSessionId: paymentInput?.stripeSessionId,
-        stripePaymentIntentId: paymentInput?.stripePaymentIntentId
+        stripePaymentIntentId: paymentInput?.stripePaymentIntentId,
+        razorpayOrderId: paymentInput?.razorpayOrderId,
+        razorpayPaymentId: paymentInput?.razorpayPaymentId,
+        razorpayPaymentMethod: paymentInput?.razorpayPaymentMethod,
+        paidAt: paymentInput?.paidAt || new Date().toISOString()
       }))
       .select('*');
 
@@ -102,7 +111,7 @@ export const createConfirmedAppointment = async ({ user, doctorId, slotId, appoi
     .eq('id', appointment._id)
     .limit(1);
 
-  const populated = toCamelObj(populatedData?.[0]);
+  const populated = withPaymentFallback(toCamelObj(populatedData?.[0]) || appointment, paid);
   try {
     const invoiceBuffer = await createInvoiceBuffer(populated, paid);
     await sendAppointmentEmail(user.email, populated);

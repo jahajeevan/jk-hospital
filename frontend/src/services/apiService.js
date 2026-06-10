@@ -7,61 +7,95 @@
 import api from '../api/client.js';
 import { normalizeDoctor, normalizeDoctors } from '../utils/doctorUtils.js';
 
+const DOCTOR_CACHE_KEY = 'jk_cached_doctors';
+
+export const DEFAULT_DOCTORS = normalizeDoctors([
+  {
+    id: 'doc-viji-001',
+    name: 'Dr. Viji',
+    specialty: 'Cardiologist',
+    department: 'Cardiology',
+    experience: 15,
+    qualification: 'MBBS, MD',
+    bio: 'Heart disease specialist with 15 years of experience',
+    fee: 500,
+    is_available: true,
+    avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80',
+    email: 'viji@jkhospital.com',
+    phone: '9876543210',
+    slots: [
+      { id: 'viji-morning', label: 'Morning', startTime: '09:00', endTime: '12:00', tokenLimit: 20, bookedTokens: 0, fee: 500, isActive: true },
+      { id: 'viji-evening', label: 'Evening OP', startTime: '18:00', endTime: '21:00', tokenLimit: 30, bookedTokens: 0, fee: 500, isActive: true }
+    ]
+  },
+  {
+    id: 'doc-sugu-001',
+    name: 'Dr. Sugu',
+    specialty: 'Dermatologist',
+    department: 'Dermatology',
+    experience: 10,
+    qualification: 'MBBS, MD',
+    bio: 'Skin specialist with 10 years of experience',
+    fee: 500,
+    is_available: true,
+    avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=800&q=80',
+    email: 'sugu@jkhospital.com',
+    phone: '9876543212',
+    slots: [
+      { id: 'sugu-morning', label: 'Morning OP', startTime: '09:00', endTime: '12:30', tokenLimit: 30, bookedTokens: 0, fee: 500, isActive: true },
+      { id: 'sugu-evening', label: 'Evening OP', startTime: '20:00', endTime: '22:30', tokenLimit: 35, bookedTokens: 0, fee: 500, isActive: true }
+    ]
+  },
+  {
+    id: 'doc-jahan-001',
+    name: 'Dr. Jahan',
+    specialty: 'ENT',
+    department: 'ENT',
+    experience: 12,
+    qualification: 'MBBS, MD',
+    bio: 'ENT specialist and surgeon for pediatric and adult patients.',
+    fee: 500,
+    is_available: true,
+    avatar: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&w=800&q=80',
+    email: 'jahan@jkhospital.com',
+    phone: '9876543211',
+    slots: [
+      { id: 'jahan-morning', label: 'Morning OP', startTime: '08:00', endTime: '23:30', tokenLimit: 30, bookedTokens: 0, fee: 500, isActive: true },
+      { id: 'jahan-evening', label: 'Evening Slot', startTime: '19:00', endTime: '22:00', tokenLimit: 30, bookedTokens: 0, fee: 500, isActive: true }
+    ]
+  }
+]);
+
+export const getCachedDoctors = () => {
+  if (typeof window === 'undefined') return DEFAULT_DOCTORS;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(DOCTOR_CACHE_KEY) || 'null');
+    return Array.isArray(cached) && cached.length ? normalizeDoctors(cached) : DEFAULT_DOCTORS;
+  } catch {
+    return DEFAULT_DOCTORS;
+  }
+};
+
+const cacheDoctors = (doctors) => {
+  if (typeof window === 'undefined' || !Array.isArray(doctors) || !doctors.length) return;
+  try {
+    sessionStorage.setItem(DOCTOR_CACHE_KEY, JSON.stringify(doctors));
+  } catch {
+    /* cache optional */
+  }
+};
+
 // ============ DOCTORS ============
 export const fetchDoctors = async () => {
   try {
     const response = await api.get('/doctors');
     const doctors = normalizeDoctors(response.data?.doctors || []);
+    if (doctors.length) cacheDoctors(doctors);
     console.log('Fetched doctors:', doctors.length > 0 ? `${doctors.length} doctors` : 'Empty list, using fallback');
-    return doctors;
+    return doctors.length ? doctors : getCachedDoctors();
   } catch (error) {
     console.error('Error fetching doctors, returning fallback:', error.message);
-    // Return fallback doctors when API fails
-    // These match what the backend returns as fallback
-    return normalizeDoctors([
-      {
-        id: 'doc-viji-001',
-        name: 'Dr. Viji',
-        specialty: 'Cardiology',
-        department: 'Cardiology',
-        experience: 15,
-        qualification: 'MBBS, MD',
-        bio: 'Heart disease specialist with 15 years of experience',
-        fee: 500,
-        is_available: true,
-        avatar: null,
-        email: 'viji@jkhospital.com',
-        phone: '9876543210'
-      },
-      {
-        id: 'doc-jahan-001',
-        name: 'Dr. Jahan',
-        specialty: 'Neurology',
-        department: 'Neurology',
-        experience: 12,
-        qualification: 'MBBS, MD',
-        bio: 'Brain and nervous system specialist with 12 years of experience',
-        fee: 500,
-        is_available: true,
-        avatar: null,
-        email: 'jahan@jkhospital.com',
-        phone: '9876543211'
-      },
-      {
-        id: 'doc-sugu-001',
-        name: 'Dr. Sugu',
-        specialty: 'Dermatology',
-        department: 'Dermatology',
-        experience: 10,
-        qualification: 'MBBS, MD',
-        bio: 'Skin specialist with 10 years of experience',
-        fee: 500,
-        is_available: true,
-        avatar: null,
-        email: 'sugu@jkhospital.com',
-        phone: '9876543212'
-      }
-    ]);
+    return getCachedDoctors();
   }
 };
 
