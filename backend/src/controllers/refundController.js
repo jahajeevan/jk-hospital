@@ -6,8 +6,8 @@ export const createRefund = asyncHandler(async (req, res) => {
   const { data: newRefunds, error } = await supabase
     .from('refund_requests')
     .insert(toSnakeObj({
-      patient: req.user._id,
-      appointment: req.body.appointmentId,
+      patientId: req.user._id,
+      appointmentId: req.body.appointmentId,
       reason: req.body.reason,
       emergencyExplanation: req.body.emergencyExplanation,
       proofUrl: req.body.proofUrl
