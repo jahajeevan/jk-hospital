@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAdmin } from '../middleware/authMiddleware.js';
+import { requireAdmin, requireUser } from '../middleware/authMiddleware.js';
 import auditController from '../controllers/auditLogsController.js';
 
 const router = express.Router();
@@ -7,8 +7,8 @@ const router = express.Router();
 // List audit logs
 router.get('/', requireAdmin, auditController.listAuditLogs);
 
-// Create audit log (can be called from anywhere)
-router.post('/', auditController.createAuditLog);
+// Create audit log — any authenticated user, actor/actorRole are always server-derived
+router.post('/', requireUser, auditController.createAuditLog);
 
 // Search by resource
 router.get('/resource/:resourceType/:resourceId', requireAdmin, auditController.getAuditLogsByResource);

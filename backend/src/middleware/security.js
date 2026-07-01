@@ -52,7 +52,14 @@ export const authLimiter = rateLimit({
   message: { success: false, message: 'Too many authentication attempts. Please wait and try again.' }
 });
 
-export const requestSizeLimit = express.json({ limit: env.requestBodyLimit });
+export const requestSizeLimit = express.json({
+  limit: env.requestBodyLimit,
+  // Stash the raw bytes so payment webhooks can verify gateway signatures,
+  // which must be computed over the exact unparsed body.
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  }
+});
 
 export const securityMiddleware = [
   helmetMiddleware,

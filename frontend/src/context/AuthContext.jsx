@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
+import api from '../api/client.js';
 
 const AuthContext = createContext(null);
 const adminEmails = new Set(
@@ -23,16 +24,34 @@ export function AuthProvider({ children }) {
   const { signOut } = useClerk();
   const [booting, setBooting] = useState(true);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
-  const [localSessionUser, setLocalSessionUser] = useState(() => {
-    try {
-      return JSON.parse(sessionStorage.getItem('jk_doctor_user') || 'null');
-    } catch {
-      return null;
+  // The role/identity used for authorization always comes from a verified
+  // /auth/me call against the stored token — never from the sessionStorage
+  // JSON blob directly, since that blob is editable via devtools and must
+  // not be trusted for access-control decisions.
+  const [localSessionUser, setLocalSessionUser] = useState(null);
+
+  const verifyLocalSession = async () => {
+    const token = sessionStorage.getItem('jk_doctor_token');
+    if (!token) {
+      setLocalSessionUser(null);
+      return;
     }
-  });
+    try {
+      const { data } = await api.get('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      const verifiedUser = data?.user;
+      if (!verifiedUser) throw new Error('No user in response');
+      setLocalSessionUser({ ...verifiedUser, id: verifiedUser._id || verifiedUser.id });
+    } catch {
+      // Token invalid/expired, or role was tampered with client-side — drop the session
+      sessionStorage.removeItem('jk_doctor_token');
+      sessionStorage.removeItem('jk_doctor_user');
+      setLocalSessionUser(null);
+    }
+  };
 
   useEffect(() => {
     const boot = async () => {
+      await verifyLocalSession();
       setBooting(false);
     };
     void boot();
@@ -46,11 +65,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const syncLocalSession = () => {
-      try {
-        setLocalSessionUser(JSON.parse(sessionStorage.getItem('jk_doctor_user') || 'null'));
-      } catch {
-        setLocalSessionUser(null);
-      }
+      void verifyLocalSession();
     };
     window.addEventListener('jk-auth-sync', syncLocalSession);
     window.addEventListener('storage', syncLocalSession);

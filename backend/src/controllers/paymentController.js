@@ -6,10 +6,60 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { formatGatewayError } from '../utils/paymentGatewayHealth.js';
 import { getRazorpayCredentials, razorpayRequest } from '../utils/razorpayClient.js';
 import { getStripe } from '../utils/stripeClient.js';
+import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 const MIN_CONSULTATION_FEE = 50;
 
 const clientUrl = () => process.env.CLIENT_URL || 'http://localhost:5173';
+
+// Patient fields carried on the gateway order/session so a webhook can rebuild
+// the appointment if the browser dies before the client confirm call. Gateway
+// metadata values are length-limited, so symptoms are truncated.
+const patientMetadata = (patientDetails = {}) => ({
+  patientName: String(patientDetails.name || '').slice(0, 200),
+  patientAge: String(patientDetails.age ?? ''),
+  patientGender: String(patientDetails.gender || ''),
+  patientPhone: String(patientDetails.phone || ''),
+  patientSymptoms: String(patientDetails.symptoms || 'Consultation').slice(0, 480)
+});
+
+/**
+ * Reconcile a captured payment into a confirmed appointment from gateway
+ * metadata alone (no request body). Idempotent: createConfirmedAppointment
+ * dedupes on transactionId, so calling this after the client already confirmed
+ * simply returns the existing appointment. Returns null when the metadata does
+ * not describe a server-account booking (e.g. the local-storage flow).
+ */
+const reconcileFromMetadata = async (meta = {}, paymentInput) => {
+  if (!meta.userId || !meta.doctorId || !meta.slotId) return null;
+
+  const { data: users } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', meta.userId)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const user = toCamelObj(users?.[0]);
+  if (!user) return null;
+
+  return createConfirmedAppointment({
+    user,
+    doctorId: meta.doctorId,
+    slotId: meta.slotId,
+    appointmentDate: meta.appointmentDate,
+    patientDetails: {
+      name: meta.patientName,
+      age: Number(meta.patientAge) || undefined,
+      gender: meta.patientGender,
+      phone: meta.patientPhone,
+      symptoms: meta.patientSymptoms || 'Consultation',
+      email: user.email
+    },
+    paymentInput
+  });
+};
 
 /** Public config — gateways with keys in .env (fast; no blocking probe). */
 export const getPaymentConfig = asyncHandler(async (_req, res) => {
@@ -81,16 +131,34 @@ const getSlotFee = (doctor, slotId) => {
   return Math.max(Number(slot.fee ?? doctor.fee ?? 500), MIN_CONSULTATION_FEE);
 };
 
-export const createRazorpayOrder = asyncHandler(async (req, res) => {
-  const { amount, doctorName, slotLabel, appointmentDate, patientDetails, preferredPaymentMode = 'upi' } = req.body;
-  requirePatientDetails(patientDetails);
-
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount) || numericAmount < MIN_CONSULTATION_FEE) {
-    const error = new Error(`Consultation fee must be at least INR ${MIN_CONSULTATION_FEE} for Razorpay payments`);
+const resolveDoctorOrThrow = async (doctorId) => {
+  if (!doctorId) {
+    const error = new Error('doctorId is required');
     error.statusCode = 400;
     throw error;
   }
+  const { data: doctors } = await supabase
+    .from('doctors')
+    .select('*, slots:doctor_slots(*)')
+    .eq('id', doctorId)
+    .is('deleted_at', null)
+    .limit(1);
+
+  const doctor = toCamelObj(doctors?.[0]);
+  if (!doctor) {
+    const error = new Error('Doctor not found');
+    error.statusCode = 404;
+    throw error;
+  }
+  return doctor;
+};
+
+export const createRazorpayOrder = asyncHandler(async (req, res) => {
+  const { doctorId, slotId, doctorName, slotLabel, appointmentDate, patientDetails, preferredPaymentMode = 'upi' } = req.body;
+  requirePatientDetails(patientDetails);
+
+  const doctor = await resolveDoctorOrThrow(doctorId);
+  const numericAmount = getSlotFee(doctor, slotId);
 
   const order = await runRazorpay(() =>
     razorpayRequest('/orders', {
@@ -100,13 +168,17 @@ export const createRazorpayOrder = asyncHandler(async (req, res) => {
         receipt: `JKH-${Date.now()}`,
         payment_capture: 1,
         notes: {
+          // Carried through to the payment.captured webhook so a lost booking
+          // can be reconciled server-side without the client confirm call.
+          userId: String(req.user._id),
+          doctorId: String(doctor._id),
+          slotId: String(slotId),
+          appointmentDate: String(appointmentDate || ''),
           doctorName: String(doctorName || ''),
           slotLabel: String(slotLabel || ''),
-          appointmentDate: String(appointmentDate || ''),
-          patientName: String(patientDetails.name || ''),
           patientEmail: String(patientDetails.email || ''),
-          patientPhone: String(patientDetails.phone || ''),
-          preferredPaymentMode: String(preferredPaymentMode)
+          preferredPaymentMode: String(preferredPaymentMode),
+          ...patientMetadata(patientDetails)
         }
       }
     })
@@ -252,7 +324,8 @@ export const createCheckoutSession = asyncHandler(async (req, res) => {
         doctorId: String(doctor._id),
         slotId: String(slotId),
         appointmentDate: String(appointmentDate),
-        preferredPaymentMode: String(preferredPaymentMode)
+        preferredPaymentMode: String(preferredPaymentMode),
+        ...patientMetadata(patientDetails)
       },
       success_url: `${clientUrl()}/payment?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${clientUrl()}/payment?cancelled=true`
@@ -263,15 +336,11 @@ export const createCheckoutSession = asyncHandler(async (req, res) => {
 });
 
 export const createLocalCheckoutSession = asyncHandler(async (req, res) => {
-  const { amount, doctorName, slotLabel, appointmentDate, patientDetails, preferredPaymentMode = 'upi' } = req.body;
+  const { doctorId, slotId, doctorName, slotLabel, appointmentDate, patientDetails, preferredPaymentMode = 'upi' } = req.body;
   requirePatientDetails(patientDetails);
 
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount) || numericAmount < MIN_CONSULTATION_FEE) {
-    const error = new Error(`Consultation fee must be at least INR ${MIN_CONSULTATION_FEE} for Stripe payments`);
-    error.statusCode = 400;
-    throw error;
-  }
+  const doctor = await resolveDoctorOrThrow(doctorId);
+  const numericAmount = getSlotFee(doctor, slotId);
 
   const session = await runStripe(() =>
     getStripe().checkout.sessions.create({
@@ -415,4 +484,87 @@ export const confirmCheckoutSession = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({ appointment: populated, invoiceReady: true });
+});
+
+/**
+ * Stripe webhook — the safety net for the "paid but browser closed before
+ * confirm" case. Reconciliation is idempotent, so this coexists with the
+ * client confirm call without creating duplicate appointments or payments.
+ * Requires the raw request body (captured in middleware/security.js) to verify
+ * the signature.
+ */
+export const stripeWebhook = asyncHandler(async (req, res) => {
+  if (!env.stripeWebhookSecret) {
+    // Acknowledge so Stripe stops retrying, but make the misconfiguration loud.
+    logger.warn('Received Stripe webhook but STRIPE_WEBHOOK_SECRET is not configured — skipping.');
+    return res.status(200).json({ received: true, skipped: 'no webhook secret configured' });
+  }
+
+  const signature = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = getStripe().webhooks.constructEvent(req.rawBody, signature, env.stripeWebhookSecret);
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Stripe webhook signature verification failed');
+    return res.status(400).json({ error: 'Webhook signature verification failed' });
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    if (session.payment_status === 'paid') {
+      // Errors here propagate to a 500 so Stripe retries with backoff; because
+      // reconciliation is idempotent, retries are safe.
+      await reconcileFromMetadata(session.metadata, {
+        amount: session.amount_total / 100,
+        currency: session.currency?.toUpperCase() || 'INR',
+        method: 'stripe',
+        status: 'success',
+        transactionId: session.id,
+        stripeSessionId: session.id,
+        stripePaymentIntentId:
+          typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id,
+        paidAt: new Date().toISOString()
+      });
+    }
+  }
+
+  res.json({ received: true });
+});
+
+/**
+ * Razorpay webhook — same reconciliation safety net for the Razorpay flow.
+ * Signature is an HMAC-SHA256 of the raw body keyed by the webhook secret.
+ */
+export const razorpayWebhook = asyncHandler(async (req, res) => {
+  if (!env.razorpayWebhookSecret) {
+    logger.warn('Received Razorpay webhook but RAZORPAY_WEBHOOK_SECRET is not configured — skipping.');
+    return res.status(200).json({ received: true, skipped: 'no webhook secret configured' });
+  }
+
+  const signature = req.headers['x-razorpay-signature'];
+  const expected = crypto.createHmac('sha256', env.razorpayWebhookSecret).update(req.rawBody).digest('hex');
+  const signatureBuf = Buffer.from(String(signature || ''));
+  const expectedBuf = Buffer.from(expected);
+  if (signatureBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(signatureBuf, expectedBuf)) {
+    logger.warn('Razorpay webhook signature verification failed');
+    return res.status(400).json({ error: 'Invalid Razorpay webhook signature' });
+  }
+
+  const event = req.body;
+  if (event?.event === 'payment.captured') {
+    const payment = event.payload?.payment?.entity || {};
+    await reconcileFromMetadata(payment.notes, {
+      amount: Number(payment.amount) / 100,
+      currency: payment.currency || 'INR',
+      method: 'razorpay',
+      status: 'success',
+      transactionId: payment.id,
+      razorpayOrderId: payment.order_id,
+      razorpayPaymentId: payment.id,
+      razorpayPaymentMethod: payment.method,
+      paidAt: new Date().toISOString()
+    });
+  }
+
+  res.json({ received: true });
 });

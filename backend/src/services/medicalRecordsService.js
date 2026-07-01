@@ -141,6 +141,17 @@ export const getMedicalDocuments = async (recordId) => {
   return toCamelObj(result || []);
 };
 
+export const getMedicalDocumentOwner = async (documentId) => {
+  const { data, error } = await supabase
+    .from('medical_documents')
+    .select('id, medical_record_id, record:medical_records(patient_id)')
+    .eq('id', documentId)
+    .limit(1);
+
+  if (error) throw error;
+  return toCamelObj(data?.[0]);
+};
+
 export const deleteMedicalDocument = async (documentId) => {
   const { data: result, error } = await supabase
     .from('medical_documents')

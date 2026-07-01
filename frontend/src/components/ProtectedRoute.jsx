@@ -35,13 +35,12 @@ function AdminAccessDenied() {
 
 export default function ProtectedRoute({ children, admin = false, roles = [], allowIncompleteProfile = false }) {
   const { user, isAdmin, needsProfileCompletion } = useAuth();
-  
-  // Check for doctor token in sessionStorage
-  const doctorUser = sessionStorage.getItem('jk_doctor_user') ? 
-    JSON.parse(sessionStorage.getItem('jk_doctor_user')) : null;
-  
-  const currentUser = user || doctorUser;
-  
+
+  // `user` already reflects a server-verified identity (Clerk session or a
+  // /auth/me-checked local staff token) — never trust a raw sessionStorage
+  // read here, since that value is editable client-side.
+  const currentUser = user;
+
   if (!currentUser) {
     if (admin) return <Navigate to="/admin/login" replace />;
     if (roles.some((role) => ['admin', 'doctor', 'receptionist', 'pharmacist', 'staff'].includes(role))) {

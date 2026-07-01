@@ -172,6 +172,20 @@ export const getDocuments = asyncHandler(async (req, res) => {
 });
 
 export const deleteDocument = asyncHandler(async (req, res) => {
+  const document = await medicalRecordsService.getMedicalDocumentOwner(req.params.documentId);
+
+  if (!document) {
+    const error = new Error('Document not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (document.record?.patientId !== req.user._id && req.user.role !== 'admin' && req.user.role !== 'doctor') {
+    const error = new Error('Unauthorized');
+    error.statusCode = 403;
+    throw error;
+  }
+
   await medicalRecordsService.deleteMedicalDocument(req.params.documentId);
 
   res.json({

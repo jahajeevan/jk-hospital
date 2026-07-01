@@ -109,6 +109,11 @@ export const createConfirmedAppointment = async ({ user, doctorId, doctorEmail, 
 
   const normalizedAppointmentDate = normalizeAppointmentDate(appointmentDate);
 
+  // If a payment row already exists for this gateway transaction, never insert
+  // a second one (the transaction_id column is UNIQUE). This is what makes the
+  // flow idempotent across: client retries, the webhook firing, and a client
+  // confirm arriving after the webhook already recorded the payment.
+  let reusablePayment = null;
   if (paymentInput?.transactionId) {
     const { data: existingPayments } = await supabase
       .from('payments')
@@ -121,8 +126,14 @@ export const createConfirmedAppointment = async ({ user, doctorId, doctorEmail, 
       const existingAppointment = await getPopulatedAppointment(existingPayment.appointmentId, existingPayment);
       if (existingAppointment) return existingAppointment;
     }
+    // Payment captured but never linked to an appointment (e.g. the browser
+    // closed before confirm, and the webhook recorded an orphan) — reuse it
+    // instead of trying to create a duplicate that would hit the constraint.
+    if (existingPayment && !existingPayment.appointmentId) {
+      reusablePayment = existingPayment;
+    }
   }
-  
+
   const { data: duplicates } = await supabase
     .from('appointments')
     .select('*')
@@ -161,8 +172,9 @@ export const createConfirmedAppointment = async ({ user, doctorId, doctorEmail, 
   }
 
   const token = await allocateToken(doctor, normalizedAppointmentDate, resolvedSlotId);
-  
-  let paid = payment;
+
+  const paymentCreatedHere = !payment && !reusablePayment;
+  let paid = payment || reusablePayment;
   if (!paid) {
     paid = await createSuccessfulPayment({ user, doctor, slotId: resolvedSlotId, paymentInput });
   }
@@ -184,7 +196,17 @@ export const createConfirmedAppointment = async ({ user, doctorId, doctorEmail, 
     }))
     .select('*');
 
-  if (appointmentError) throw appointmentError;
+  if (appointmentError) {
+    // Token allocation races (two payments confirming the same slot at once)
+    // surface here as a unique-constraint violation. Without this cleanup the
+    // payment row would stay orphaned (no appointment_id) and permanently
+    // block retries on the same transactionId (unique constraint), leaving
+    // the patient charged with no appointment and no way to recover.
+    if (paymentCreatedHere) {
+      await supabase.from('payments').delete().eq('id', paid._id);
+    }
+    throw appointmentError;
+  }
   const appointment = toCamelObj(newAppointments?.[0]);
 
   // Backlink appointment to payment

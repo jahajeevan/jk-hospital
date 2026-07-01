@@ -85,6 +85,12 @@ export const getAppointmentPrescription = asyncHandler(async (req, res) => {
 
   // Return first (should be only one)
   const prescription = prescriptions[0];
+  if (prescription.patientId !== req.user._id && !['admin', 'doctor', 'pharmacist'].includes(req.user.role)) {
+    const error = new Error('Unauthorized');
+    error.statusCode = 403;
+    throw error;
+  }
+
   res.json({
     success: true,
     prescription,

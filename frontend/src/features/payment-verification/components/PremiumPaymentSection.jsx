@@ -151,14 +151,15 @@ export default function PremiumPaymentSection({ booking, user }) {
 
   const buildOrderPayload = useCallback(
     () => ({
-      amount,
+      doctorId: booking.doctor._id || booking.doctor.id,
+      slotId: booking.slot._id || booking.slot.id,
       doctorName: booking.doctor.name,
       slotLabel: booking.slot.label,
       appointmentDate: booking.date,
       preferredPaymentMode: selectedMode,
       patientDetails: { ...booking.patient, email: user?.email }
     }),
-    [amount, booking, selectedMode, user]
+    [booking, selectedMode, user]
   );
 
   const startStripeCheckout = async () => {

@@ -1,54 +1,61 @@
-import { supabase, toCamelObj, toSnakeObj } from '../config/supabase.js';
+import { supabase, toCamelObj } from '../config/supabase.js';
+
+// The live pharmacy_inventory table (source of truth) has these columns:
+//   name, batch_number, expiry_date, purchase_price, selling_price,
+//   current_stock, minimum_stock_level, created_at, updated_at
+// The frontend already speaks this vocabulary (name/batchNumber/expiryDate/
+// purchasePrice/sellingPrice/currentStock/minimumStockLevel), so this service
+// maps straight onto the real columns. (An earlier version wrote item_name/
+// quantity/unit_price/reorder_level, which do not exist — hence 0 rows ever.)
 
 const isMissingInventoryTable = (error) => {
   const text = `${error?.message || ''} ${error?.details || ''}`;
-  return error?.code === '42P01' || /pharmacy_inventory/i.test(text) && /not find|does not exist|schema cache/i.test(text);
+  return error?.code === '42P01' || (/pharmacy_inventory/i.test(text) && /not find|does not exist|schema cache/i.test(text));
 };
 
-const inventoryInput = (data = {}) => ({
-  itemName: data.itemName || data.name || 'Medicine',
-  quantity: Number(data.quantity ?? data.currentStock ?? 0),
-  unitPrice: Number(data.unitPrice ?? data.sellingPrice ?? 0),
-  reorderLevel: Number(data.reorderLevel ?? data.minimumStockLevel ?? 10),
-  category: data.category || data.batchNumber || '',
-  supplier: data.supplier || '',
-  expiryDate: data.expiryDate || null,
-  metadata: {
-    ...(data.metadata || {}),
-    batchNumber: data.batchNumber || data.metadata?.batchNumber || '',
-    purchasePrice: Number(data.purchasePrice ?? data.metadata?.purchasePrice ?? 0)
-  }
-});
+const numberOrUndefined = (value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
 
+// Build a snake_case row from whatever the caller sends, accepting both the
+// frontend field names and the legacy alias names the controller may pass.
+const toRow = (data = {}) => {
+  const row = {};
+  const set = (column, value) => {
+    if (value !== undefined) row[column] = value;
+  };
+
+  set('name', data.name ?? data.itemName);
+  set('batch_number', data.batchNumber ?? data.batch_number ?? data.category);
+  if (data.expiryDate !== undefined || data.expiry_date !== undefined) {
+    row.expiry_date = data.expiryDate || data.expiry_date || null;
+  }
+  set('purchase_price', numberOrUndefined(data.purchasePrice ?? data.purchase_price));
+  set('selling_price', numberOrUndefined(data.sellingPrice ?? data.unitPrice ?? data.selling_price));
+  set('current_stock', numberOrUndefined(data.currentStock ?? data.quantity ?? data.current_stock));
+  set('minimum_stock_level', numberOrUndefined(data.minimumStockLevel ?? data.reorderLevel ?? data.minimum_stock_level));
+  return row;
+};
+
+// Output aliases keep the controller's compatibility checks (item.quantity,
+// item.unitPrice) working while the frontend consumes the real field names.
 const inventoryOutput = (row) => {
   const item = toCamelObj(row);
   if (!item) return item;
   return {
     ...item,
-    name: item.name || item.itemName,
-    batchNumber: item.batchNumber || item.metadata?.batchNumber || item.category || '',
-    purchasePrice: Number(item.purchasePrice ?? item.metadata?.purchasePrice ?? 0),
-    sellingPrice: Number(item.sellingPrice ?? item.unitPrice ?? 0),
-    currentStock: Number(item.currentStock ?? item.quantity ?? 0),
-    minimumStockLevel: Number(item.minimumStockLevel ?? item.reorderLevel ?? 10)
+    quantity: item.currentStock ?? 0,
+    unitPrice: item.sellingPrice ?? 0,
+    reorderLevel: item.minimumStockLevel ?? 0
   };
 };
 
 export const createInventoryItem = async (data) => {
-  const input = inventoryInput(data);
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
-    .insert(toSnakeObj({
-      itemName: input.itemName,
-      quantity: input.quantity,
-      unitPrice: input.unitPrice,
-      reorderLevel: input.reorderLevel,
-      category: input.category,
-      supplier: input.supplier,
-      expiryDate: input.expiryDate,
-      metadata: input.metadata,
-      updatedAt: new Date().toISOString()
-    }))
+    .insert({ ...toRow(data), updated_at: new Date().toISOString() })
     .select();
 
   if (error) throw error;
@@ -66,33 +73,12 @@ export const getInventoryItem = async (id) => {
   return inventoryOutput(result?.[0]) || null;
 };
 
-export const listInventory = async (limit = 100, offset = 0, category = null) => {
-  let query = supabase
-    .from('pharmacy_inventory')
-    .select('*')
-    .order('item_name', { ascending: true });
-
-  if (category) {
-    query = query.eq('category', category);
-  }
-
-  query = query.range(offset, offset + limit - 1);
-
-  const { data: result, error } = await query;
-
-  if (error) {
-    if (isMissingInventoryTable(error)) return [];
-    throw error;
-  }
-  return (result || []).map(inventoryOutput);
-};
-
-export const getInventoryByCategory = async (category) => {
+export const listInventory = async (limit = 100, offset = 0) => {
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
     .select('*')
-    .eq('category', category)
-    .order('item_name', { ascending: true });
+    .order('name', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     if (isMissingInventoryTable(error)) return [];
@@ -102,41 +88,27 @@ export const getInventoryByCategory = async (category) => {
 };
 
 export const getLowStockItems = async (limit = 50) => {
+  // Postgrest can't compare two columns directly, so fetch and filter in JS
+  // (the inventory table is small).
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
     .select('*')
-    .lt('quantity', 'reorder_level')
-    .order('quantity', { ascending: true })
-    .limit(limit);
+    .order('current_stock', { ascending: true });
 
   if (error) {
     if (isMissingInventoryTable(error)) return [];
     throw error;
   }
-  return (result || []).map(inventoryOutput);
+  return (result || [])
+    .map(inventoryOutput)
+    .filter((item) => (item.currentStock ?? 0) <= (item.minimumStockLevel ?? 0))
+    .slice(0, limit);
 };
 
 export const updateInventoryItem = async (id, data) => {
-  const updateData = {};
-  if (data.itemName !== undefined || data.name !== undefined) updateData.itemName = data.itemName || data.name;
-  if (data.quantity !== undefined || data.currentStock !== undefined) updateData.quantity = Number(data.quantity ?? data.currentStock);
-  if (data.unitPrice !== undefined || data.sellingPrice !== undefined) updateData.unitPrice = Number(data.unitPrice ?? data.sellingPrice);
-  if (data.reorderLevel !== undefined || data.minimumStockLevel !== undefined) updateData.reorderLevel = Number(data.reorderLevel ?? data.minimumStockLevel);
-  if (data.category !== undefined) updateData.category = data.category;
-  if (data.supplier !== undefined) updateData.supplier = data.supplier;
-  if (data.expiryDate !== undefined) updateData.expiryDate = data.expiryDate;
-  if (data.metadata !== undefined || data.batchNumber !== undefined || data.purchasePrice !== undefined) {
-    updateData.metadata = {
-      ...(data.metadata || {}),
-      ...(data.batchNumber !== undefined ? { batchNumber: data.batchNumber } : {}),
-      ...(data.purchasePrice !== undefined ? { purchasePrice: Number(data.purchasePrice) } : {})
-    };
-  }
-  updateData.updatedAt = new Date().toISOString();
-
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
-    .update(toSnakeObj(updateData))
+    .update({ ...toRow(data), updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
 
@@ -145,23 +117,13 @@ export const updateInventoryItem = async (id, data) => {
   return inventoryOutput(result[0]);
 };
 
-export const restockItem = async (id, quantity, notes = '') => {
-  // Get current
+export const restockItem = async (id, quantity, _notes = '') => {
   const current = await getInventoryItem(id);
   if (!current) return null;
 
-  const newQuantity = current.quantity + quantity;
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
-    .update({
-      quantity: newQuantity,
-      metadata: {
-        ...(current.metadata || {}),
-        lastRestocked: new Date().toISOString(),
-        restockNotes: notes
-      },
-      updated_at: new Date().toISOString()
-    })
+    .update({ current_stock: (current.currentStock ?? 0) + Number(quantity), updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
 
@@ -173,13 +135,10 @@ export const removeStock = async (id, quantity) => {
   const current = await getInventoryItem(id);
   if (!current) return null;
 
-  const newQuantity = Math.max(0, current.quantity - quantity);
+  const nextStock = Math.max(0, (current.currentStock ?? 0) - Number(quantity));
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
-    .update({
-      quantity: newQuantity,
-      updated_at: new Date().toISOString()
-    })
+    .update({ current_stock: nextStock, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
 
@@ -198,13 +157,15 @@ export const deleteInventoryItem = async (id) => {
 };
 
 export const searchInventory = async (query) => {
-  const searchTerm = `%${query}%`;
   const { data: result, error } = await supabase
     .from('pharmacy_inventory')
     .select('*')
-    .ilike('item_name', searchTerm)
-    .order('item_name', { ascending: true });
+    .ilike('name', `%${query}%`)
+    .order('name', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingInventoryTable(error)) return [];
+    throw error;
+  }
   return (result || []).map(inventoryOutput);
 };

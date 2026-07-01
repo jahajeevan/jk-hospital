@@ -56,6 +56,8 @@ export const env = {
   ollamaRetries: Number(process.env.OLLAMA_RETRIES || 1),
   geminiApiKey: process.env.GEMINI_API_KEY,
   geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
   apiVersion: 'v1'
 };
 

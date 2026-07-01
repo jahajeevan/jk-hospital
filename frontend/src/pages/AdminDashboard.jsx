@@ -1,14 +1,12 @@
 import { motion } from 'framer-motion';
-import { CalendarPlus, Eye, Image, LockKeyhole, MailCheck, Plus, ShieldCheck, Stethoscope, Trash2, X } from 'lucide-react';
+import { CalendarPlus, Eye, Image, MailCheck, Plus, Stethoscope, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api/client.js';
 import MetricCard from '../components/MetricCard.jsx';
+import MedicineInventoryPanel from '../components/MedicineInventoryPanel.jsx';
 import Modal from '../components/ui/Modal.jsx';
-import { closeAdminSession, isAdminSessionOpen, openAdminSession, verifyAdminCredential } from '../utils/adminAuth.js';
 import { DEPARTMENTS } from '../utils/localStore.js';
 import { fetchAppointments, fetchDoctors, fetchRefundRequests, updateRefundRequest, updateDoctor as updateDoctorApi, updateDoctorSlot, createDoctorSlot as createDoctorSlotApi, createDoctor as createDoctorApi, updateAppointment, deleteDoctor as deleteDoctorApi, deleteSlot as deleteSlotApi } from '../services/apiService.js';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -90,16 +88,9 @@ const buildOverviewFromBookings = (items, refunds = []) => {
 };
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
-  
-  // Allow access if:
-  // 1. Clerk user is logged in as admin, OR
-  // 2. JWT token (email/password login) is in sessionStorage
-  const hasToken = sessionStorage.getItem('jk_doctor_token');
-  if (!user && !hasToken) return <Navigate to="/admin/login" replace />;
-  
-  const [unlocked, setUnlocked] = useState(() => isAdminSessionOpen());
-  const [password, setPassword] = useState('');
+  // Access to this component is already gated by <ProtectedRoute admin> in
+  // App.jsx (server-verified role), and every API call below is re-checked
+  // by the backend — no additional client-side gate is needed here.
   const [selectedProof, setSelectedProof] = useState(null);
   const [overview, setOverview] = useState({ stats: { appointments: 0, patients: 0, pendingRefunds: 0, revenue: 0 } });
   const [bookings, setBookings] = useState([]);
@@ -209,23 +200,6 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error marking leave:', error);
       toast.error(error.response?.data?.message || 'Could not mark doctor leave');
-    }
-  };
-
-  const login = async (event) => {
-    event.preventDefault();
-    try {
-      const valid = await verifyAdminCredential(password);
-      if (!valid) {
-        toast.error('Wrong admin password');
-        return;
-      }
-      openAdminSession();
-      setUnlocked(true);
-      setPassword('');
-      toast.success('Admin dashboard unlocked');
-    } catch (error) {
-      toast.error(error.message || 'Could not unlock admin panel');
     }
   };
 
@@ -545,22 +519,6 @@ export default function AdminDashboard() {
     }
   };
 
-  if (!unlocked) {
-    return (
-    <main className="hospital-bg grid min-h-[calc(100vh-4rem)] place-items-center py-12">
-        <motion.form onSubmit={login} className="glass w-full max-w-md rounded-lg p-8 text-center" initial={{ opacity: 0, scale: 0.96, rotateX: -8 }} animate={{ opacity: 1, scale: 1, rotateX: 0 }}>
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-lg bg-medical-600 text-white shadow-soft">
-            <LockKeyhole size={28} />
-          </div>
-          <h1 className="mt-5 text-3xl font-bold">Admin access</h1>
-          <p className="mt-2 text-sm text-slate-500">Reception panel. First unlock sets your encrypted staff password on this device.</p>
-          <input className="field mt-6 text-center" type="password" placeholder="Staff password (min 10 chars)" value={password} onChange={(event) => setPassword(event.target.value)} />
-          <button className="btn-primary mt-4 w-full"><ShieldCheck size={18} /> Unlock dashboard</button>
-        </motion.form>
-      </main>
-    );
-  }
-
   return (
     <main className="hospital-bg min-h-[calc(100vh-4rem)] py-10">
       <div className="container-pad">
@@ -569,7 +527,6 @@ export default function AdminDashboard() {
           <p className="font-semibold text-medical-600">Admin control room</p>
           <h1 className="mt-2 text-4xl font-bold">Operations, tokens, refunds, and analytics</h1>
         </div>
-        <button type="button" onClick={() => { closeAdminSession(); setUnlocked(false); }} className="btn-secondary px-4 py-2">Lock panel</button>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <MetricCard label="Total appointments" value={overview.stats.appointments} />
@@ -585,7 +542,8 @@ export default function AdminDashboard() {
           ['overview', 'Overview'],
           ['bookings', 'Bookings'],
           ['doctors', 'Doctors'],
-          ['refunds', 'Refunds']
+          ['refunds', 'Refunds'],
+          ['inventory', 'Inventory']
         ].map(([id, label]) => (
           <button key={id} type="button" onClick={() => setAdminTab(id)} className={`tab-pill ${adminTab === id ? 'tab-pill-active' : 'bg-white ring-1 ring-slate-200'}`}>
             {label}
@@ -992,6 +950,9 @@ export default function AdminDashboard() {
           </div>
         </section>
       )}
+
+      {adminTab === 'inventory' && <MedicineInventoryPanel />}
+
       <Modal
         open={doctorFormOpen}
         title="Add doctor"

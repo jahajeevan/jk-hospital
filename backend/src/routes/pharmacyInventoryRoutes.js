@@ -1,22 +1,25 @@
 import express from 'express';
-import { requireAdmin, requireUser } from '../middleware/authMiddleware.js';
+import { requirePermission, requireUser } from '../middleware/authMiddleware.js';
+import { PERMISSIONS } from '../config/permissions.js';
 import inventoryController from '../controllers/pharmacyInventoryController.js';
 
 const router = express.Router();
 
-// Public read endpoints
-router.get('/', inventoryController.listInventory);
-router.get('/search', inventoryController.searchInventory);
-router.get('/low-stock', requireAdmin, inventoryController.getLowStockItems);
-router.get('/:id', inventoryController.getInventoryItem);
+const requireInventoryManage = requirePermission(PERMISSIONS.PHARMACY_INVENTORY_MANAGE);
 
-// Admin write endpoints
-router.post('/', requireAdmin, inventoryController.createItem);
-router.patch('/:id', requireAdmin, inventoryController.updateItem);
-router.delete('/:id', requireAdmin, inventoryController.deleteItem);
+// Read endpoints — any authenticated staff member
+router.get('/', requireUser, inventoryController.listInventory);
+router.get('/search', requireUser, inventoryController.searchInventory);
+router.get('/low-stock', requireUser, requireInventoryManage, inventoryController.getLowStockItems);
+router.get('/:id', requireUser, inventoryController.getInventoryItem);
+
+// Write endpoints — admin or pharmacist
+router.post('/', requireUser, requireInventoryManage, inventoryController.createItem);
+router.patch('/:id', requireUser, requireInventoryManage, inventoryController.updateItem);
+router.delete('/:id', requireUser, requireInventoryManage, inventoryController.deleteItem);
 
 // Stock management
-router.post('/:id/restock', requireAdmin, inventoryController.restockItem);
-router.post('/:id/remove-stock', requireAdmin, inventoryController.removeStock);
+router.post('/:id/restock', requireUser, requireInventoryManage, inventoryController.restockItem);
+router.post('/:id/remove-stock', requireUser, requireInventoryManage, inventoryController.removeStock);
 
 export default router;

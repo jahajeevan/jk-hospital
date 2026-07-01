@@ -16,7 +16,8 @@ export const PERMISSIONS = Object.freeze({
   REFUNDS_MANAGE: 'refunds:manage',
   NOTIFICATIONS_MANAGE: 'notifications:manage',
   MEDICAL_RECORDS_READ: 'medical-records:read',
-  MEDICAL_RECORDS_WRITE: 'medical-records:write'
+  MEDICAL_RECORDS_WRITE: 'medical-records:write',
+  PHARMACY_INVENTORY_MANAGE: 'pharmacy-inventory:manage'
 });
 
 export const rolePermissions = {
@@ -32,7 +33,8 @@ export const rolePermissions = {
     PERMISSIONS.APPOINTMENTS_READ_ALL,
     PERMISSIONS.APPOINTMENTS_MANAGE,
     PERMISSIONS.PAYMENTS_READ,
-    PERMISSIONS.NOTIFICATIONS_MANAGE
+    PERMISSIONS.NOTIFICATIONS_MANAGE,
+    PERMISSIONS.PHARMACY_INVENTORY_MANAGE
   ],
   [ROLES.DOCTOR]: [
     PERMISSIONS.APPOINTMENTS_READ_ALL,

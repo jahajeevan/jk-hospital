@@ -87,6 +87,12 @@ export const getAppointmentBill = asyncHandler(async (req, res) => {
     return;
   }
 
+  if (bill.patientId !== req.user._id && !['admin', 'doctor', 'pharmacist'].includes(req.user.role)) {
+    const error = new Error('Unauthorized');
+    error.statusCode = 403;
+    throw error;
+  }
+
   res.json({
     success: true,
     bill,

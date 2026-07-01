@@ -1,7 +1,8 @@
-import { Activity, Bell, ClipboardCheck, FileText, Pill, Plus, ReceiptText, Search, Stethoscope, UserCheck } from 'lucide-react';
+import { Activity, Bell, ClipboardCheck, FileText, Plus, ReceiptText, Search, Stethoscope, UserCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import MetricCard from '../components/MetricCard.jsx';
+import MedicineInventoryPanel from '../components/MedicineInventoryPanel.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api/client.js';
@@ -14,7 +15,7 @@ import {
   updateAppointmentWorkflow,
   createWalkInBooking
 } from '../utils/localStore.js';
-import { fetchUserAppointments, fetchAppointments, fetchDoctors, fetchAuditLogs, fetchPharmacyInventory, fetchNotifications, fetchInventoryItem, updateInventoryItem, createInventoryItem, deleteInventoryItem } from '../services/apiService.js';
+import { fetchUserAppointments, fetchAppointments, fetchDoctors, fetchAuditLogs, fetchPharmacyInventory, fetchNotifications } from '../services/apiService.js';
 import { getDoctorDepartment } from '../utils/doctorUtils.js';
 
 const tabs = [
@@ -24,6 +25,14 @@ const tabs = [
   ['inventory', 'Inventory'],
   ['audit', 'Audit']
 ];
+
+// When a standalone dashboard route (e.g. /pharmacist) only cares about a
+// subset of tabs, this maps that route's initialTab to the tabs it may switch between.
+const standaloneTabGroups = {
+  reception: ['reception'],
+  doctor: ['doctor'],
+  pharmacy: ['pharmacy', 'inventory']
+};
 
 const roleMeta = {
   reception: {
@@ -54,7 +63,6 @@ const roleMeta = {
 };
 
 const emptyRx = { symptoms: '', medicines: [{ name: '', morning: '', afternoon: '', night: '', days: '' }] };
-const emptyMedicine = { name: '', batchNumber: '', expiryDate: '', purchasePrice: '', sellingPrice: '', currentStock: '', minimumStockLevel: '' };
 const todayLocal = () => {
   const value = new Date();
   value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
@@ -81,7 +89,6 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   const [rxForm, setRxForm] = useState(emptyRx);
   const [billBookingId, setBillBookingId] = useState('');
   const [billItems, setBillItems] = useState([{ medicineId: '', name: '', quantity: 1, totalCost: 0 }]);
-  const [medicineForm, setMedicineForm] = useState(emptyMedicine);
   const [doctorFilter, setDoctorFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
 
@@ -157,7 +164,6 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
   });
   const pharmacyQueue = bookings.filter((item) => ['prescription_generated', 'pharmacy_pending'].includes(item.status));
   const completedToday = bookings.filter((item) => item.status === 'completed');
-  const alerts = []; // Inventory alerts are now loaded from API via notifications
   const selectedWalkInDoctor = doctors.find((doctor) => doctor._id === walkIn.doctorId) || null;
   const walkInSlotOptions = selectedWalkInDoctor ? getWalkInSlotOptions(selectedWalkInDoctor, walkIn.date) : [];
   const selectedBillBooking = bookings.find((booking) => booking._id === billBookingId);
@@ -209,7 +215,9 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
     toast.success('Prescription saved and sent to pharmacy');
   };
 
-  const visibleTabs = standalone ? [] : tabs;
+  const visibleTabs = standalone
+    ? tabs.filter(([id]) => (standaloneTabGroups[initialTab] || [initialTab]).includes(id))
+    : tabs;
   const meta = roleMeta[tab] || roleMeta.reception;
   const slotOptions = Array.from(new Set(bookings.map((item) => item.slotLabel).filter(Boolean)));
 
@@ -230,34 +238,6 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
     setBillItems([{ medicineId: '', name: '', quantity: 1, totalCost: 0 }]);
     reload();
     toast.success('Bill paid, inventory updated, visit summary saved');
-  };
-
-  const submitMedicine = async () => {
-    if (!medicineForm.name.trim()) return toast.error('Enter medicine name');
-    try {
-      const newMedicine = {
-        name: medicineForm.name.trim(),
-        batchNumber: medicineForm.batchNumber.trim(),
-        expiryDate: medicineForm.expiryDate,
-        purchasePrice: Number(medicineForm.purchasePrice) || 0,
-        sellingPrice: Number(medicineForm.sellingPrice) || 0,
-        currentStock: Number(medicineForm.currentStock) || 0,
-        minimumStockLevel: Number(medicineForm.minimumStockLevel) || 0
-      };
-      
-      // Create inventory item via API
-      await createInventoryItem(newMedicine);
-      
-      // Refresh inventory
-      const freshInventory = await fetchPharmacyInventory();
-      setInventory(Array.isArray(freshInventory) ? freshInventory : []);
-      
-      setMedicineForm(emptyMedicine);
-      toast.success('Inventory updated');
-    } catch (error) {
-      console.error('Error adding medicine:', error);
-      toast.error('Failed to add medicine');
-    }
   };
 
   return (
@@ -512,42 +492,7 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
           </section>
         )}
 
-        {tab === 'inventory' && (
-          <section className="patient-panel mt-8 rounded-xl p-5">
-            <h2 className="flex items-center gap-2 text-xl font-bold"><Pill size={19} /> Medicine inventory</h2>
-            {alerts.length ? <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">{alerts.length} stock or expiry alert{alerts.length > 1 ? 's' : ''} need attention.</p> : null}
-            <div className="mt-4 grid gap-3 md:grid-cols-4">
-              {['name', 'batchNumber', 'expiryDate', 'purchasePrice', 'sellingPrice', 'currentStock', 'minimumStockLevel'].map((field) => (
-                <input key={field} className="field" type={field === 'expiryDate' ? 'date' : ['purchasePrice', 'sellingPrice', 'currentStock', 'minimumStockLevel'].includes(field) ? 'number' : 'text'} placeholder={field.replace(/([A-Z])/g, ' $1')} value={medicineForm[field]} onChange={(e) => setMedicineForm((v) => ({ ...v, [field]: e.target.value }))} />
-              ))}
-              <button type="button" className="btn-primary" onClick={submitMedicine}>Save medicine</button>
-            </div>
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="text-slate-500"><tr><th className="py-3">Medicine</th><th>Batch</th><th>Expiry</th><th>Buy</th><th>Sell</th><th>Stock</th><th>Alert</th><th /></tr></thead>
-                <tbody>
-                  {inventory.map((medicine) => (
-                    <tr key={medicine._id} className="border-t border-slate-200">
-                      <td className="py-3 font-bold">{medicine.name}</td><td>{medicine.batchNumber}</td><td>{medicine.expiryDate}</td><td>INR {medicine.purchasePrice}</td><td>INR {medicine.sellingPrice}</td><td>{medicine.currentStock}</td>
-                      <td>{medicine.currentStock <= medicine.minimumStockLevel ? <span className="text-xs font-bold text-rose-700">LOW STOCK</span> : 'OK'}</td>
-                      <td><button type="button" className="text-xs font-bold text-rose-700" onClick={async () => { 
-                        try {
-                          await deleteInventoryItem(medicine._id);
-                          const freshInventory = await fetchPharmacyInventory();
-                          setInventory(Array.isArray(freshInventory) ? freshInventory : []);
-                          toast.success('Medicine deleted');
-                        } catch (error) {
-                          console.error('Error deleting medicine:', error);
-                          toast.error('Failed to delete medicine');
-                        }
-                      }}>Delete</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+        {tab === 'inventory' && <MedicineInventoryPanel onChanged={reloadInventory} />}
 
         {tab === 'audit' && (
           <section className="patient-panel mt-8 rounded-xl p-5">

@@ -83,3 +83,13 @@ export const razorpayRequest = (path, { method = 'POST', body } = {}) => {
     req.end();
   });
 };
+
+/**
+ * Issue a refund for a captured Razorpay payment.
+ * @param {string} paymentId — razorpay_payment_id
+ * @param {number} amountInRupees — full or partial amount to refund
+ */
+export const refundRazorpayPayment = (paymentId, amountInRupees) =>
+  razorpayRequest(`/payments/${paymentId}/refund`, {
+    body: { amount: Math.round(Number(amountInRupees) * 100) }
+  });

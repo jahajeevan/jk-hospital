@@ -4,31 +4,29 @@ import { requireAdmin } from '../middleware/authMiddleware.js';
 
 export const createAuditLog = asyncHandler(async (req, res) => {
   const {
-    actor,
-    actorRole,
     action,
     resourceType,
     resourceId,
-    details,
-    ipAddress,
-    userAgent
+    details
   } = req.body;
 
-  if (!action || !actor) {
-    const error = new Error('Action and actor are required');
+  if (!action) {
+    const error = new Error('Action is required');
     error.statusCode = 400;
     throw error;
   }
 
+  // actor/actorRole always come from the verified session, never from client input,
+  // otherwise anyone could forge audit entries under someone else's identity
   const log = await auditService.createAuditLog({
-    actor,
-    actorRole,
+    actor: req.user.email || req.user._id,
+    actorRole: req.user.role,
     action,
     resourceType,
     resourceId,
     details,
-    ipAddress,
-    userAgent
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent']
   });
 
   // Don't return the audit log (fire and forget)
