@@ -134,13 +134,20 @@ export const updateBillStatus = async (id, status, notes = '') => {
 export const addBillItems = async (billId, items) => {
   if (!items || items.length === 0) return [];
 
-  const itemRecords = items.map(item => ({
-    bill_id: billId,
-    medicine_name: item.medicineName || item.name,
-    quantity: item.quantity || 1,
-    rate: item.rate || item.unitPrice || 0,
-    amount: (item.quantity || 1) * (item.rate || item.unitPrice || 0)
-  }));
+  // Live pharmacy_bill_items columns: bill_id, inventory_id, medicine_name,
+  // quantity, unit_price, total, created_at.
+  const itemRecords = items.map(item => {
+    const quantity = Number(item.quantity) || 1;
+    const unitPrice = Number(item.unitPrice ?? item.rate ?? 0);
+    return {
+      bill_id: billId,
+      inventory_id: item.inventoryId || item.medicineId || null,
+      medicine_name: item.medicineName || item.name || null,
+      quantity,
+      unit_price: unitPrice,
+      total: quantity * unitPrice
+    };
+  });
 
   const { data: result, error } = await supabase
     .from('pharmacy_bill_items')
@@ -165,12 +172,12 @@ export const updateBillItems = async (billId, items) => {
 export const calculateBillTotal = async (billId) => {
   const { data: result, error } = await supabase
     .from('pharmacy_bill_items')
-    .select('amount')
+    .select('total')
     .eq('bill_id', billId);
 
   if (error) throw error;
 
-  const total = (result || []).reduce((sum, item) => sum + (item.amount || 0), 0);
+  const total = (result || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
   return total;
 };
 

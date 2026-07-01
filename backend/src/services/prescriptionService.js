@@ -142,12 +142,13 @@ export const createPrescriptionMedicines = async (prescriptionId, medicines) => 
 };
 
 export const updatePrescriptionMedicines = async (prescriptionId, medicines) => {
-  // Delete existing
+  // prescription_medicines has no deleted_at column, and replacing a
+  // prescription's medicine list is a true replace (not an archive), so hard
+  // delete the old rows before inserting the new set.
   await supabase
     .from('prescription_medicines')
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq('prescription_id', prescriptionId);
 
-  // Create new
   return createPrescriptionMedicines(prescriptionId, medicines);
 };

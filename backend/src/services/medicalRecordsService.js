@@ -116,12 +116,16 @@ export const deleteMedicalRecord = async (id) => {
   return result && result.length > 0;
 };
 
-export const uploadMedicalDocument = async (recordId, documentUrl) => {
+export const uploadMedicalDocument = async (recordId, documentUrl, fileName) => {
+  // Live medical_documents columns: medical_record_id, file_name, file_path,
+  // file_type, file_size, created_at. The URL maps to file_path.
+  const derivedName = fileName || String(documentUrl || '').split('/').pop() || 'document';
   const { data: result, error } = await supabase
     .from('medical_documents')
     .insert({
       medical_record_id: recordId,
-      document_url: documentUrl,
+      file_name: derivedName,
+      file_path: documentUrl,
       created_at: new Date().toISOString()
     })
     .select();

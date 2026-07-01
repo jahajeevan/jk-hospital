@@ -9,17 +9,15 @@
 -- exists (production) and a create where it does not (fresh clone / CI). It
 -- will NOT alter columns on an existing table.
 --
--- KNOWN DRIFT (pre-existing, tracked separately — do NOT "fix" by editing this
--- file to match the code; the code is what's wrong):
---   * pharmacy_inventory: service now matches these columns (fixed 2026-07-01).
---   * pharmacy_bills / pharmacy_bill_items: pharmacyBillService.js writes
---     payment_status/notes/medicine_name/rate/amount, which do NOT exist here.
---   * medical_records: has no deleted_at, but medicalRecordsService filters on it.
---   * medical_documents: has file_name/file_path/file_type/file_size, but the
---     service writes document_url.
---   * prescription_medicines: has no deleted_at, but updatePrescriptionMedicines
---     writes it.
--- The correct fix for each is to align the service to these columns.
+-- DRIFT RESOLVED 2026-07-01:
+--   * pharmacy_inventory: service aligned to these columns.
+--   * pharmacy_bills: added payment_status + notes (see
+--     2026-07-01_clinical_columns_alignment.sql) — reflected below.
+--   * pharmacy_bill_items: added medicine_name; service maps rate->unit_price,
+--     amount->total — reflected below.
+--   * medical_records: added deleted_at — reflected below.
+--   * medical_documents: service maps document_url->file_path (+file_name).
+--   * prescription_medicines: service now hard-deletes on list replace.
 
 -- 1. Medical records
 CREATE TABLE IF NOT EXISTS public.medical_records (
@@ -35,7 +33,8 @@ CREATE TABLE IF NOT EXISTS public.medical_records (
   pdf_ready BOOLEAN DEFAULT false,
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE INDEX IF NOT EXISTS medical_records_patient_created_idx ON public.medical_records (patient_id, created_at DESC);
@@ -94,6 +93,8 @@ CREATE TABLE IF NOT EXISTS public.pharmacy_bills (
   pharmacist_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
   total_amount NUMERIC NOT NULL DEFAULT 0,
   payment_method VARCHAR,
+  payment_status VARCHAR NOT NULL DEFAULT 'pending',
+  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -106,6 +107,7 @@ CREATE TABLE IF NOT EXISTS public.pharmacy_bill_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   bill_id UUID NOT NULL REFERENCES public.pharmacy_bills(id) ON DELETE CASCADE,
   inventory_id UUID REFERENCES public.pharmacy_inventory(id) ON DELETE SET NULL,
+  medicine_name VARCHAR,
   quantity INTEGER NOT NULL,
   unit_price NUMERIC NOT NULL,
   total NUMERIC NOT NULL,

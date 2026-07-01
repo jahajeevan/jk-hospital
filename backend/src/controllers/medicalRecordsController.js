@@ -114,7 +114,7 @@ export const deleteMedicalRecord = asyncHandler(async (req, res) => {
 });
 
 export const uploadDocument = asyncHandler(async (req, res) => {
-  const { documentUrl } = req.body;
+  const { documentUrl, fileName } = req.body;
 
   if (!documentUrl) {
     const error = new Error('Document URL is required');
@@ -137,7 +137,7 @@ export const uploadDocument = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  const document = await medicalRecordsService.uploadMedicalDocument(req.params.id, documentUrl);
+  const document = await medicalRecordsService.uploadMedicalDocument(req.params.id, documentUrl, fileName);
 
   res.status(201).json({
     success: true,
