@@ -9,3 +9,6 @@ build
 coverage
 npm-debug.log*
 .vercel
+
+# Vendored UI/UX design-intelligence skills (re-installable via `npx ui-ux-pro-max-cli init --ai claude`)
+.claude/skills/

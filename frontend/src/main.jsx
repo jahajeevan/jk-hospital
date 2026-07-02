@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { BrowserRouter } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -69,15 +70,21 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           afterSignOutUrl="/"
         >
           <ThemeProvider>
-            <BrowserRouter>
-              <AuthProvider>
-                <App />
-                <Toaster
-                  position="top-right"
-                  toastOptions={{ duration: 3500 }}
-                />
-              </AuthProvider>
-            </BrowserRouter>
+            {/* reducedMotion="user" makes ALL framer-motion animations app-wide
+                honor prefers-reduced-motion (transforms are dropped, opacity
+                kept). The global CSS reduced-motion rule only covers CSS
+                transitions, not framer-motion's rAF-driven animations. */}
+            <MotionConfig reducedMotion="user">
+              <BrowserRouter>
+                <AuthProvider>
+                  <App />
+                  <Toaster
+                    position="top-right"
+                    toastOptions={{ duration: 3500 }}
+                  />
+                </AuthProvider>
+              </BrowserRouter>
+            </MotionConfig>
           </ThemeProvider>
         </ClerkProvider>
       ) : (

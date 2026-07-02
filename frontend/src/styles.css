@@ -7,6 +7,55 @@
   color: #0f172a;
   background: #f4f8fb;
   color-scheme: light;
+
+  /* ---- Semantic design tokens (single source of truth) ----
+     Components should reference these via Tailwind (bg-surface, text-foreground,
+     border-line, text-muted, bg-primary) instead of hardcoding hex, so the
+     brand and light/dark stay consistent. Brand stays medical-blue + mint. */
+  --surface: #ffffff;          /* cards, panels */
+  --surface-2: #f4f8fb;        /* page background, subtle fills */
+  --foreground: #102033;       /* primary text (ink) */
+  --muted-foreground: #5b6b7f; /* secondary text — meets 4.5:1 on white */
+  --border: #e2e8f0;           /* dividers, card borders */
+  --primary: #0d63ad;          /* medical-600 — primary actions/brand */
+  --primary-foreground: #ffffff;
+  --accent: #10b981;           /* mint — success / CTA accent */
+  --ring: #147bd1;             /* focus ring — medical-500 */
+
+  /* Motion tokens — keep every animation on the same rhythm. */
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 150ms;
+  --dur-base: 240ms;
+  --dur-slow: 360ms;
+}
+
+.dark {
+  color-scheme: dark;
+  --surface: #0f1b2d;
+  --surface-2: #0a1422;
+  --foreground: #e6edf5;
+  --muted-foreground: #93a4b8;   /* meets 4.5:1 on dark surface */
+  --border: #1e2d42;
+  --primary: #3ba3e3;            /* lighter tonal variant for dark (not inverted) */
+  --primary-foreground: #06121f;
+  --accent: #34d399;
+  --ring: #3ba3e3;
+}
+
+/* Global keyboard focus ring (accessibility, CRITICAL). Only shows for keyboard
+   users via :focus-visible, so mouse clicks stay clean. Applies to every
+   interactive element across all surfaces without per-component work. */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 body {
