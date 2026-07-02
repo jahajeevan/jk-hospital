@@ -10,7 +10,7 @@ export default function ProfilePage() {
           <p className="flex items-center gap-2 font-semibold text-medical-600">
             <ShieldCheck size={17} /> Secure account
           </p>
-          <h1 className="mt-2 text-3xl font-bold text-ink sm:text-4xl">Profile settings</h1>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl" style={{ background: 'linear-gradient(115deg,#0a528f,#147bd1 45%,#10b981)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Profile settings</h1>
           <p className="text-wrap-anywhere mt-2 max-w-2xl text-slate-600">
             Manage your JK Hospital identity, email verification, password, Google login, and active sessions.
           </p>

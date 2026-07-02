@@ -246,7 +246,7 @@ export default function StaffDashboard({ initialTab = 'reception', standalone = 
         <section className="patient-hero-panel">
           <div>
             <span className="live-badge">{meta.badge}</span>
-            <h1 className="mt-4 text-3xl font-bold sm:text-4xl">{meta.title}</h1>
+            <h1 className="mt-4 text-3xl font-bold sm:text-4xl" style={{ background: 'linear-gradient(115deg,#0a528f,#147bd1 45%,#10b981)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{meta.title}</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">{meta.text}</p>
           </div>
         </section>

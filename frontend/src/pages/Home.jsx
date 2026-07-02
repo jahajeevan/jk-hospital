@@ -133,19 +133,22 @@ export default function Home() {
                 <Phone size={18} /> Emergency
               </a>
             </motion.div>
-            <motion.div variants={fadeUp} className="hero-stats mt-10 flex flex-wrap gap-8 text-sm text-white/75 lg:justify-start justify-center">
+            <motion.div
+              variants={fadeUp}
+              className="mx-auto mt-10 grid max-w-xl grid-cols-3 divide-x divide-white/15 rounded-2xl border border-white/20 bg-white/10 px-2 py-4 backdrop-blur-xl lg:mx-0"
+            >
               {[
                 ['42k+', 'Patients served'],
                 ['98%', 'Wait clarity'],
                 ['< 2 min', 'To book a token']
               ].map(([val, label]) => (
-                <div key={label}>
-                  <p className="text-2xl font-bold text-white">{val}</p>
-                  <p>{label}</p>
+                <div key={label} className="px-3 text-center">
+                  <p className="text-2xl font-extrabold text-white">{val}</p>
+                  <p className="mt-1 text-xs font-medium text-white/70">{label}</p>
                 </div>
               ))}
             </motion.div>
-            <motion.div variants={fadeUp} className="hero-chips mt-8 flex flex-wrap gap-2 lg:justify-start justify-center">
+            <motion.div variants={fadeUp} className="hero-chips mt-6 flex flex-wrap gap-2 lg:justify-start justify-center">
               {['Secure payments', 'Live tokens', 'Digital invoices'].map((chip) => (
                 <span key={chip} className="hero-chip">
                   <ShieldCheck size={14} /> {chip}

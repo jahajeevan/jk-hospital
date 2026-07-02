@@ -147,7 +147,7 @@ export default function BookingPage() {
         <section className="booking-hero-panel">
           <div>
             <span className="live-badge">Appointment booking</span>
-            <h1>Book your hospital token</h1>
+            <h1 style={{ background: 'linear-gradient(115deg,#0a528f,#147bd1 45%,#10b981)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Book your hospital token</h1>
             <p>Choose a doctor, pick a valid OP slot, add patient details, and confirm with a live queue summary.</p>
           </div>
           <div className="booking-rule-card">

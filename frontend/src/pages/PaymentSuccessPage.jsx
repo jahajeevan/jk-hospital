@@ -54,7 +54,7 @@ export default function PaymentSuccessPage() {
           <p className="mt-8 font-semibold text-emerald-600 dark:text-emerald-400">
             Payment verified by {gateway}
           </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">Appointment confirmed</h1>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl" style={{ background: 'linear-gradient(115deg,#0a528f,#147bd1 45%,#10b981)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Appointment confirmed</h1>
           <div className="mt-8 grid gap-3 rounded-xl bg-white p-5 text-left text-sm shadow-lg dark:bg-slate-800/80 sm:grid-cols-2">
             <p className="text-wrap-anywhere">
               <strong>Doctor:</strong> {appointment.doctor?.name}

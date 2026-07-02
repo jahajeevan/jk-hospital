@@ -48,7 +48,20 @@ export default function Doctors() {
       <section className="doctors-hero">
         <div className="container-pad">
           <span className="live-badge">Live specialist schedules</span>
-          <h1>Meet the doctors behind JK Hospital</h1>
+          <h1>
+            Meet the{' '}
+            <span
+              style={{
+                background: 'linear-gradient(115deg, #147bd1 0%, #10b981 100%)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent'
+              }}
+            >
+              doctors
+            </span>{' '}
+            behind JK Hospital
+          </h1>
           <p>Compare live token availability, consultation fees, OP timings, and specialities before booking.</p>
           <div className="doctors-hero-stats">
             <span><UsersRound size={18} /> {doctors.length} specialists</span>

@@ -525,7 +525,7 @@ export default function AdminDashboard() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-semibold text-medical-600">Admin control room</p>
-          <h1 className="mt-2 text-4xl font-bold">Operations, tokens, refunds, and analytics</h1>
+          <h1 className="mt-2 text-4xl font-bold" style={{ background: 'linear-gradient(115deg,#0a528f,#147bd1 45%,#10b981)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Operations, tokens, refunds, and analytics</h1>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">

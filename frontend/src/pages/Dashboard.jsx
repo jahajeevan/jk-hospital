@@ -127,7 +127,12 @@ export default function Dashboard() {
         <div className="patient-hero-panel flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="live-badge">Patient portal</span>
-            <h1 className="text-wrap-anywhere mt-4 text-3xl font-bold sm:text-4xl">Hello, {user?.name}</h1>
+            <h1
+              className="text-wrap-anywhere mt-4 text-3xl font-bold sm:text-4xl"
+              style={{ background: 'linear-gradient(115deg,#0a528f,#147bd1 45%,#10b981)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}
+            >
+              Hello, {user?.name}
+            </h1>
             <p className="text-wrap-anywhere mt-1 text-sm text-slate-500">{user?.email}</p>
           </div>
           <Link to="/book" className="btn-primary"><Plus size={18} /> Book new visit</Link>
